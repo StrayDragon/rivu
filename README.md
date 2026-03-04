@@ -21,6 +21,7 @@ Rivu is an **AG-UI compatible UI runtime (kernel) + component kit**, designed to
 
 - Install: `pnpm install`
 - TS build+test: `pnpm test`
+- React demo: `pnpm -C examples/rivu-react-demo dev`
 - Rust tests: `cargo test`
 - Python tests: `cd python && uv run pytest`
 
@@ -75,4 +76,4 @@ Use the kernel store + resolver:
 - `docs/integration-zirvox.md` — Zirvox WS delta/final/abort → AG-UI + `seq` adapter shape
 - `docs/integration-crystalith.md` — Crystalith SSE chunk/done/error → AG-UI SSE + removing `[[crystalith-ui:v1]]`
 - `docs/export-review.md` — snapshot/export/review + restoring `state.ui` via `STATE_SNAPSHOT`
-
+- `examples/rivu-react-demo` — runnable React demo for viewer + workflow components
