@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import { uiStateV1Schema } from '../src/state-ui.js';
 import { uiV1CustomEventSchema, uiV1EventValueSchema } from '../src/ui-v1-event.js';
+import { uiV1CapabilitiesCustomEventSchema, uiV1CapabilitiesValueV1Schema } from '../src/ui-v1-capabilities.js';
 import { uiDataRefV1Schema, uiDatasetV1Schema } from '../src/ui-datasets.js';
 import { a2uiV1Schema } from '../src/a2ui-v1.js';
 import { chartPropsV1Schema } from '../src/ui-chart.js';
@@ -20,6 +21,8 @@ function toConstExport(name: string, value: unknown) {
 async function main() {
   const uiV1EventValueJsonSchema = uiV1EventValueSchema.toJSONSchema();
   const uiV1CustomEventJsonSchema = uiV1CustomEventSchema.toJSONSchema();
+  const uiV1CapabilitiesValueV1JsonSchema = uiV1CapabilitiesValueV1Schema.toJSONSchema();
+  const uiV1CapabilitiesCustomEventJsonSchema = uiV1CapabilitiesCustomEventSchema.toJSONSchema();
   const uiStateV1JsonSchema = uiStateV1Schema.toJSONSchema();
   const uiDatasetV1JsonSchema = uiDatasetV1Schema.toJSONSchema();
   const uiDataRefV1JsonSchema = uiDataRefV1Schema.toJSONSchema();
@@ -33,6 +36,10 @@ async function main() {
     toConstExport('uiV1EventValueJsonSchema', uiV1EventValueJsonSchema),
     '\n',
     toConstExport('uiV1CustomEventJsonSchema', uiV1CustomEventJsonSchema),
+    '\n',
+    toConstExport('uiV1CapabilitiesValueV1JsonSchema', uiV1CapabilitiesValueV1JsonSchema),
+    '\n',
+    toConstExport('uiV1CapabilitiesCustomEventJsonSchema', uiV1CapabilitiesCustomEventJsonSchema),
     '\n',
     toConstExport('uiStateV1JsonSchema', uiStateV1JsonSchema),
     '\n',

@@ -14,6 +14,15 @@ from .state_ui_patch import (
 )
 from .a2ui_v1 import A2uiV1, decode_a2ui_v1_with_limits_v1
 from .a2ui_bridge import InMemoryKeyMapStore, SqliteKeyMapStore, compile_a2ui_v1
+from .ui_v1_capabilities import (
+    UI_V1_CAPABILITIES_NAME,
+    UiV1CapabilitiesCustomEvent,
+    UiV1CapabilitiesValueV1,
+    choose_compatible,
+    choose_viewer_chart_component_v1,
+    decode_ui_v1_capabilities_with_limits_v1,
+    is_supported,
+)
 from .ui_v1_event import UI_V1_EVENT_NAME, UiV1CustomEvent, UiV1EventValue
 from .seq import SeqAllocator
 from .sse import encode_sse_event
@@ -51,6 +60,13 @@ __all__ = [
     "compile_a2ui_v1",
     "InMemoryKeyMapStore",
     "SqliteKeyMapStore",
+    "UI_V1_CAPABILITIES_NAME",
+    "UiV1CapabilitiesValueV1",
+    "UiV1CapabilitiesCustomEvent",
+    "decode_ui_v1_capabilities_with_limits_v1",
+    "is_supported",
+    "choose_compatible",
+    "choose_viewer_chart_component_v1",
     "UiMountV1",
     "UiComponentV1",
     "UiDatasetV1",

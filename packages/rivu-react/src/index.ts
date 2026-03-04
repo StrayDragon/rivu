@@ -26,5 +26,7 @@ export { RivuProvider, useRivuContext } from './provider.js';
 
 export { createClientRequestId } from './client-request-id.js';
 
+export { buildUiV1Capabilities } from './ui-v1-capabilities.js';
+
 export * from './ui-kit/viewer.js';
 export * from './ui-kit/workflow.js';

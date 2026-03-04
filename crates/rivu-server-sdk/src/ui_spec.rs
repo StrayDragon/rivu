@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 pub const UI_V1_EVENT_NAME: &str = "ui.v1.event";
+pub const UI_V1_CAPABILITIES_NAME: &str = "ui.v1.capabilities";
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DecodeLimits {
@@ -121,6 +122,192 @@ pub fn parse_ui_v1_custom_event(bytes: &[u8], limits: DecodeLimits) -> Result<Ui
     let event: UiV1CustomEvent = serde_json::from_value(value)?;
     event.validate()?;
     Ok(event)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UiV1CapabilitiesComponentRangeV1 {
+    pub min_schema_version: u64,
+    pub max_schema_version: u64,
+}
+
+impl UiV1CapabilitiesComponentRangeV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if self.min_schema_version == 0 {
+            return Err(UiSpecError::ValidationError("minSchemaVersion must be >= 1".into()));
+        }
+        if self.max_schema_version == 0 {
+            return Err(UiSpecError::ValidationError("maxSchemaVersion must be >= 1".into()));
+        }
+        if self.max_schema_version < self.min_schema_version {
+            return Err(UiSpecError::ValidationError(
+                "maxSchemaVersion must be >= minSchemaVersion".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiV1CapabilitiesChartFeaturesV1 {
+    #[serde(default)]
+    pub marks: Option<Vec<String>>,
+    #[serde(default)]
+    pub interactions: Option<Vec<String>>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiV1CapabilitiesExportFeaturesV1 {
+    #[serde(default)]
+    pub formats: Option<Vec<String>>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiV1CapabilitiesFeaturesV1 {
+    #[serde(default)]
+    pub datasets: Option<bool>,
+    #[serde(default)]
+    pub lifecycle: Option<bool>,
+    #[serde(default)]
+    pub chart: Option<UiV1CapabilitiesChartFeaturesV1>,
+    #[serde(default)]
+    pub export: Option<UiV1CapabilitiesExportFeaturesV1>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiV1CapabilitiesValueV1 {
+    pub v: u64,
+    pub components: BTreeMap<String, UiV1CapabilitiesComponentRangeV1>,
+
+    #[serde(default)]
+    pub features: Option<UiV1CapabilitiesFeaturesV1>,
+    #[serde(default)]
+    pub client: Option<Map<String, Value>>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl UiV1CapabilitiesValueV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if self.v != 1 {
+            return Err(UiSpecError::ValidationError("v must be 1".into()));
+        }
+
+        for (component_type, range) in &self.components {
+            if component_type.trim().is_empty() {
+                return Err(UiSpecError::ValidationError("components keys must be non-empty".into()));
+            }
+            range.validate()?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiV1CapabilitiesCustomEvent {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    pub name: String,
+    pub value: UiV1CapabilitiesValueV1,
+
+    #[serde(default)]
+    pub timestamp: Option<f64>,
+    #[serde(default)]
+    pub raw_event: Option<Value>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl UiV1CapabilitiesCustomEvent {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if self.event_type != "CUSTOM" {
+            return Err(UiSpecError::ValidationError("type must be CUSTOM".into()));
+        }
+        if self.name != UI_V1_CAPABILITIES_NAME {
+            return Err(UiSpecError::ValidationError("name must be ui.v1.capabilities".into()));
+        }
+        self.value.validate()?;
+        Ok(())
+    }
+}
+
+pub fn parse_ui_v1_capabilities_custom_event(bytes: &[u8], limits: DecodeLimits) -> Result<UiV1CapabilitiesCustomEvent, UiSpecError> {
+    let value: Value = serde_json::from_slice(bytes)?;
+    check_limits(bytes, &value, limits)?;
+    let event: UiV1CapabilitiesCustomEvent = serde_json::from_value(value)?;
+    event.validate()?;
+    Ok(event)
+}
+
+pub fn ui_v1_capabilities_is_supported(capabilities: &UiV1CapabilitiesValueV1, component_type: &str, schema_version: u64) -> bool {
+    let Some(range) = capabilities.components.get(component_type) else {
+        return false;
+    };
+    range.min_schema_version <= schema_version && schema_version <= range.max_schema_version
+}
+
+pub fn ui_v1_capabilities_choose_compatible(
+    capabilities: &UiV1CapabilitiesValueV1,
+    candidates: &[(&str, u64)],
+) -> Option<(String, u64)> {
+    let mut best: std::collections::HashMap<&str, u64> = std::collections::HashMap::new();
+    for (component_type, schema_version) in candidates {
+        if !ui_v1_capabilities_is_supported(capabilities, component_type, *schema_version) {
+            continue;
+        }
+        best.entry(*component_type)
+            .and_modify(|v| *v = (*v).max(*schema_version))
+            .or_insert(*schema_version);
+    }
+
+    for (component_type, _) in candidates {
+        if let Some(version) = best.get(component_type) {
+            return Some(((*component_type).to_string(), *version));
+        }
+    }
+
+    None
+}
+
+pub fn choose_viewer_chart_component_v1(capabilities: &UiV1CapabilitiesValueV1, mark: &str) -> Option<(String, u64)> {
+    let supported_marks = capabilities
+        .features
+        .as_ref()
+        .and_then(|f| f.chart.as_ref())
+        .and_then(|c| c.marks.as_ref());
+
+    let chart_ok = ui_v1_capabilities_is_supported(capabilities, "Chart", 1)
+        && supported_marks.is_some_and(|marks| marks.iter().any(|m| m == mark));
+
+    let mut candidates: Vec<(&str, u64)> = Vec::new();
+    if chart_ok {
+        candidates.push(("Chart", 1));
+    }
+
+    if mark == "bar" {
+        candidates.push(("BarChart", 1));
+    } else if mark == "line" {
+        candidates.push(("LineChart", 1));
+    }
+
+    ui_v1_capabilities_choose_compatible(capabilities, &candidates)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -100,6 +100,213 @@ export const uiV1CustomEventJsonSchema = {
   "additionalProperties": {}
 } as const;
 
+export const uiV1CapabilitiesValueV1JsonSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "v": {
+      "type": "number",
+      "const": 1
+    },
+    "components": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "minSchemaVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "maxSchemaVersion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "minSchemaVersion",
+          "maxSchemaVersion"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "datasets": {
+          "type": "boolean"
+        },
+        "lifecycle": {
+          "type": "boolean"
+        },
+        "chart": {
+          "type": "object",
+          "properties": {
+            "marks": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "interactions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": {}
+        },
+        "export": {
+          "type": "object",
+          "properties": {
+            "formats": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": {}
+    },
+    "client": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {}
+    }
+  },
+  "required": [
+    "v",
+    "components"
+  ],
+  "additionalProperties": {}
+} as const;
+
+export const uiV1CapabilitiesCustomEventJsonSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "type": {
+      "type": "string",
+      "const": "CUSTOM"
+    },
+    "name": {
+      "type": "string",
+      "const": "ui.v1.capabilities"
+    },
+    "value": {
+      "type": "object",
+      "properties": {
+        "v": {
+          "type": "number",
+          "const": 1
+        },
+        "components": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "minSchemaVersion": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "maxSchemaVersion": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "minSchemaVersion",
+              "maxSchemaVersion"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "features": {
+          "type": "object",
+          "properties": {
+            "datasets": {
+              "type": "boolean"
+            },
+            "lifecycle": {
+              "type": "boolean"
+            },
+            "chart": {
+              "type": "object",
+              "properties": {
+                "marks": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "interactions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "additionalProperties": {}
+            },
+            "export": {
+              "type": "object",
+              "properties": {
+                "formats": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "additionalProperties": {}
+            }
+          },
+          "additionalProperties": {}
+        },
+        "client": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "v",
+        "components"
+      ],
+      "additionalProperties": {}
+    },
+    "timestamp": {
+      "type": "number"
+    },
+    "rawEvent": {}
+  },
+  "required": [
+    "type",
+    "name",
+    "value"
+  ],
+  "additionalProperties": {}
+} as const;
+
 export const uiStateV1JsonSchema = {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",

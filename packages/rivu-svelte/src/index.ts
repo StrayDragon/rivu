@@ -10,5 +10,7 @@ export { createRegistry } from './registry.js';
 
 export { componentRendererStore } from './component-renderer-store.js';
 
+export { buildUiV1Capabilities } from './ui-v1-capabilities.js';
+
 export type { ResolveUiComponentResult } from './resolve.js';
 export { resolveUiComponentV1 } from './resolve.js';

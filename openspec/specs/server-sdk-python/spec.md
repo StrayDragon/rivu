@@ -98,3 +98,19 @@ Python SDK MUST 提供编译器，将 `a2ui.v1` payloads 转换为 RFC 6902 JSON
 - **WHEN** payload 创建组件并将其挂载到某个 message slot
 - **THEN** 编译器返回用于创建组件条目并添加 mount 的 patch ops
 
+### Requirement: Python SDK 解码与校验 `ui.v1.capabilities`
+Python SDK MUST 提供 strict encode/decode/validate utilities for `CUSTOM(name="ui.v1.capabilities")`。
+
+#### Scenario: Reject invalid schemaVersion range
+- **WHEN** `maxSchemaVersion < minSchemaVersion`
+- **THEN** SDK validators 拒绝该 capabilities payload
+
+### Requirement: Python SDK 提供组件兼容性判断与降级选择 helper
+Python SDK MUST 提供 helper utilities，用于：
+- 判断某个 `(componentType, schemaVersion)` 是否被客户端 capabilities 支持
+- 在一组候选组件（类型/版本）中选择最兼容的一个（或返回 “无可用”）
+
+#### Scenario: Choose a compatible fallback component
+- **WHEN** 客户端不支持 `Chart@1`，但支持 `BarChart@1`
+- **THEN** helper 能从候选集合中选择 `BarChart@1` 作为兼容降级
+

@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "uiV1Capabilities": {
+    "valid": [
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.capabilities",
+        "value": {
+          "v": 1,
+          "components": {
+            "ReportSection": { "minSchemaVersion": 1, "maxSchemaVersion": 1 },
+            "MetricCard": { "minSchemaVersion": 1, "maxSchemaVersion": 1 }
+          }
+        }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.capabilities",
+        "timestamp": 1710000000,
+        "value": {
+          "v": 1,
+          "components": {
+            "Chart": { "minSchemaVersion": 1, "maxSchemaVersion": 1 }
+          },
+          "features": {
+            "datasets": true,
+            "lifecycle": true,
+            "chart": { "marks": ["bar", "line", "pie"], "interactions": [] },
+            "export": { "formats": ["json"] },
+            "unknownFutureKey": { "ok": true }
+          },
+          "client": { "framework": "react", "runtime": "demo" },
+          "unknownRootField": 123
+        }
+      }
+    ],
+    "invalid": [
+      null,
+      {},
+      { "type": "CUSTOM", "name": "ui.v1.capabilities" },
+      { "type": "CUSTOM", "name": "ui.v1.capabilities", "value": [] },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.capabilities",
+        "value": { "v": 2, "components": {} }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.capabilities",
+        "value": { "v": 1, "components": [] }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.capabilities",
+        "value": { "v": 1, "components": { "MetricCard": { "minSchemaVersion": 2, "maxSchemaVersion": 1 } } }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.capabilities",
+        "value": {
+          "v": 1,
+          "components": { "MetricCard": { "minSchemaVersion": 1, "maxSchemaVersion": 1 } },
+          "features": { "datasets": "yes" }
+        }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.capabilities",
+        "value": {
+          "v": 1,
+          "components": { "MetricCard": { "minSchemaVersion": 1, "maxSchemaVersion": 1 } },
+          "features": { "chart": { "marks": [1] } }
+        }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.capabilities",
+        "value": {
+          "v": 1,
+          "components": { "MetricCard": { "minSchemaVersion": 1, "maxSchemaVersion": 1 } },
+          "features": { "chart": { "interactions": [false] } }
+        }
+      }
+    ]
+  }
+}
+

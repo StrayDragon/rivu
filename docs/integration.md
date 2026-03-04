@@ -96,6 +96,49 @@ Each registration is a whitelist entry:
 - `propsSchema/stateSchema` validate the server-owned data
 - `render(...)` must be pure rendering (no tool execution in browser)
 
+### Capabilities handshake (`ui.v1.capabilities`) (recommended)
+
+If your host can vary the registry (custom components, trimmed UI kit, multi-framework deployments), have the client report what it can render.
+
+When to send:
+- Once on connection established / before the first request.
+- Re-send whenever registry/features change (e.g. app upgrade), or periodically (TTL) if your server caches per session.
+
+React helper:
+
+```ts
+import { buildUiV1Capabilities } from 'rivu-react';
+
+const capabilitiesEvent = {
+  type: 'CUSTOM',
+  name: 'ui.v1.capabilities',
+  value: {
+    ...buildUiV1Capabilities(registry, {
+      // optional overrides/extensions
+      export: { formats: ['json'] },
+    }),
+    client: { framework: 'react', runtime: 'web' },
+  },
+};
+```
+
+Svelte helper: `buildUiV1Capabilities` is also exported by `rivu-svelte`.
+
+Server-side guidance:
+- Treat capabilities as a hint, not a security boundary.
+- Prefer the highest supported `schemaVersion` for a `componentType`.
+- Downgrade deterministically when unsupported (e.g. `Chart` → `BarChart`/`LineChart`).
+- If `features.datasets = false`, prefer conservative output (inline data instead of `dataRef`).
+- Unknown `features.*` keys must be ignored (forward-compatible).
+
+SDK helpers:
+- Python: `decode_ui_v1_capabilities_with_limits_v1`, `is_supported`, `choose_compatible`
+- Rust: `parse_ui_v1_capabilities_custom_event`, `ui_v1_capabilities_is_supported`, `ui_v1_capabilities_choose_compatible`
+
+Missing / stale capabilities:
+- Server must still work with conservative output.
+- Client must always degrade safely via `UnknownComponentCard` (never crash).
+
 ### Rendering
 
 ```tsx

@@ -6,6 +6,7 @@ import {
   DATA_TABLE_COMPONENT_TYPE,
   DataTable,
   ProtocolInspector,
+  buildUiV1Capabilities,
   createRegistry,
   dataTableRegistrationV1,
   useKernelState,
@@ -171,7 +172,14 @@ export function App() {
 
     return {
       kernel,
-      bootstrap: () => server!.bootstrap(),
+      bootstrap: () => {
+        void server!.capabilitiesTransport({
+          type: 'CUSTOM',
+          name: 'ui.v1.capabilities',
+          value: { ...buildUiV1Capabilities(registry), client: { framework: 'react', runtime: 'rivu-react-demo' } },
+        });
+        server!.bootstrap();
+      },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);

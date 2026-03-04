@@ -11,8 +11,11 @@ mod a2ui_bridge;
 
 pub use ui_spec::{
     parse_a2ui_v1, parse_ui_data_ref_v1, parse_ui_dataset_v1, parse_ui_state_v1, parse_ui_v1_custom_event, reduce_envelopes_v1,
-    A2uiMountV1, A2uiOpV1, A2uiV1, DecodeLimits, ReduceEnvelopeV1, ReduceGapV1, ReduceResultV1, UiComponentV1, UiDataRefV1,
-    UiDatasetV1, UiMountV1, UiSpecError, UiStateV1, UiV1CustomEvent, UiV1EventValue, UI_V1_EVENT_NAME,
+    parse_ui_v1_capabilities_custom_event, ui_v1_capabilities_choose_compatible, ui_v1_capabilities_is_supported,
+    choose_viewer_chart_component_v1, A2uiMountV1, A2uiOpV1, A2uiV1, DecodeLimits, ReduceEnvelopeV1, ReduceGapV1, ReduceResultV1,
+    UiComponentV1, UiDataRefV1, UiDatasetV1, UiMountV1, UiSpecError, UiStateV1, UiV1CapabilitiesChartFeaturesV1,
+    UiV1CapabilitiesComponentRangeV1, UiV1CapabilitiesCustomEvent, UiV1CapabilitiesExportFeaturesV1, UiV1CapabilitiesFeaturesV1,
+    UiV1CapabilitiesValueV1, UiV1CustomEvent, UiV1EventValue, UI_V1_CAPABILITIES_NAME, UI_V1_EVENT_NAME,
 };
 
 pub use seq::{SeqAllocator, SeqError};

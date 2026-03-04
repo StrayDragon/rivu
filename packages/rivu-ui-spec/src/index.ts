@@ -22,6 +22,26 @@ export {
 } from './ui-v1-event.js';
 
 export type {
+  UiV1CapabilitiesChartFeaturesV1,
+  UiV1CapabilitiesComponentV1,
+  UiV1CapabilitiesCustomEvent,
+  UiV1CapabilitiesExportFeaturesV1,
+  UiV1CapabilitiesFeaturesV1,
+  UiV1CapabilitiesValueV1,
+} from './ui-v1-capabilities.js';
+export {
+  UI_V1_CAPABILITIES_NAME,
+  uiV1CapabilitiesChartFeaturesV1Schema,
+  uiV1CapabilitiesComponentV1Schema,
+  uiV1CapabilitiesCustomEventSchema,
+  uiV1CapabilitiesExportFeaturesV1Schema,
+  uiV1CapabilitiesFeaturesV1Schema,
+  uiV1CapabilitiesValueV1Schema,
+  safeParseUiV1CapabilitiesCustomEvent,
+  safeParseUiV1CapabilitiesValueV1,
+} from './ui-v1-capabilities.js';
+
+export type {
   UiInputDecodeLimitsV1,
   UiInputJsonPatchLimitsV1,
   UiInputLimitsV1,
@@ -47,6 +67,8 @@ export {
   uiInputLimitsV1JsonSchema,
   uiV1CustomEventJsonSchema,
   uiV1EventValueJsonSchema,
+  uiV1CapabilitiesValueV1JsonSchema,
+  uiV1CapabilitiesCustomEventJsonSchema,
 } from './json-schema.generated.js';
 
 export type { LimitExceededErrorV1, LimitsCheckResult } from './limits-policy.js';

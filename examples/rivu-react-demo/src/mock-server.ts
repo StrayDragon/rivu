@@ -1,5 +1,5 @@
 import type { RivuEnvelope, RivuKernel } from 'rivu-kernel';
-import type { UiV1CustomEvent } from 'rivu-ui-spec';
+import type { UiV1CapabilitiesCustomEvent, UiV1CustomEvent } from 'rivu-ui-spec';
 
 type JsonPatchOp =
   | { op: 'add' | 'replace'; path: string; value: unknown }
@@ -27,6 +27,7 @@ function assertRecord(value: unknown, message: string): asserts value is Record<
 export type MockServer = {
   bootstrap: () => void;
   actionTransport: (action: UiV1CustomEvent) => Promise<void>;
+  capabilitiesTransport: (capabilities: UiV1CapabilitiesCustomEvent) => Promise<void>;
   getSharedState: () => Record<string, unknown>;
 };
 
@@ -186,9 +187,15 @@ export function createMockServer(params: {
     emit({ type: 'STATE_DELTA', delta: result.patch });
   };
 
+  const capabilitiesTransport = async (capabilities: UiV1CapabilitiesCustomEvent) => {
+    // eslint-disable-next-line no-console
+    console.log('[mock-server] received ui.v1.capabilities', capabilities.value);
+  };
+
   return {
     bootstrap,
     actionTransport,
+    capabilitiesTransport,
     getSharedState: () => sharedState,
   };
 }
