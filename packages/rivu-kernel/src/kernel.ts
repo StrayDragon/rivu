@@ -185,7 +185,7 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
     if (event.type === 'STATE_SNAPSHOT') {
       const snapshot = (event as any).snapshot as unknown;
       if (!isJsonObject(snapshot)) {
-        setState({ ...state, needsResync: true, resyncReason: 'patch_error' });
+        setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null });
         return { status: 'needs_resync', reason: 'patch_error' };
       }
       setState({
@@ -202,14 +202,14 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
     if (event.type === 'STATE_DELTA') {
       const delta = (event as any).delta as unknown;
       if (!Array.isArray(delta)) {
-        setState({ ...state, needsResync: true, resyncReason: 'patch_error' });
+        setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null });
         return { status: 'needs_resync', reason: 'patch_error' };
       }
       try {
         const result = applyPatch(state.sharedState, delta as any[], true, false);
         const nextSharedState = result.newDocument as unknown;
         if (!isJsonObject(nextSharedState)) {
-          setState({ ...state, needsResync: true, resyncReason: 'patch_error' });
+          setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null });
           return { status: 'needs_resync', reason: 'patch_error' };
         }
         setState({
@@ -222,7 +222,7 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
         });
         return { status: 'applied', seq };
       } catch {
-        setState({ ...state, needsResync: true, resyncReason: 'patch_error' });
+        setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null });
         return { status: 'needs_resync', reason: 'patch_error' };
       }
     }

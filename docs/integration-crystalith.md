@@ -1,4 +1,4 @@
-# Crystalith Integration (SSE + envelope → AG-UI SSE + `state.ui`)
+# Crystalith Integration (SSE + envelope → AG-UI SSE + `sharedState.ui`)
 
 Crystalith today:
 
@@ -11,7 +11,7 @@ Rivu migration goal:
 1. Server emits **AG-UI events** over SSE with `id: seq`
 2. Rich UI is expressed via **`STATE_SNAPSHOT/STATE_DELTA` updating `sharedState.ui`**
 3. Frontend uses `rivu-kernel` to reduce events into state
-4. UI is rendered from `state.ui` via `ComponentRenderer` (React) or Svelte resolver primitives
+4. UI is rendered from `sharedState.ui` via `ComponentRenderer` (React) or Svelte resolver primitives
 
 ## Where to look (current Crystalith)
 
@@ -72,4 +72,3 @@ With SSE:
 - reconnect with `Last-Event-ID` / `?resumeFrom=<lastSeq>`
 
 Kernel’s `lastSeq` is the canonical resume point.
-

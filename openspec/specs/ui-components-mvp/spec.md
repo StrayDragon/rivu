@@ -1,4 +1,9 @@
-## ADDED Requirements
+# ui-components-mvp Specification
+
+## Purpose
+Define requirements for the v1 MVP UI kit components, including viewer-safe stateless components and workflow stateful round-trip components.
+
+## Requirements
 
 ### Requirement: Viewer profile ships stateless, replayable components
 The UI kit MUST include a Viewer-oriented subset of components that are stateless (no server-authoritative writes) and replayable from `state.ui` snapshots.
@@ -57,4 +62,3 @@ Components MAY emit `ui.v1.event` actions, but tool execution and authorization 
 #### Scenario: Interaction does not call tool locally
 - **WHEN** a user submits a `FormCard`
 - **THEN** the frontend only sends `ui.v1.event` and does not perform side-effecting actions locally
-

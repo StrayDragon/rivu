@@ -7,7 +7,7 @@ Rivu migration goal:
 1. **Wrap WS events with `seq`** (use an existing monotonic cursor if available)
 2. Convert to **AG-UI text events**
 3. Feed `{ seq, event }` into `rivu-kernel`
-4. Render UI components from `state.ui` via `ComponentRenderer` (no need to rewrite the whole chat UI)
+4. Render UI components from `sharedState.ui` via `ComponentRenderer` (no need to rewrite the whole chat UI)
 
 ## Where to look (current Zirvox)
 
@@ -76,7 +76,7 @@ If Zirvox’s WS layer supports replay-by-cursor (it already has `initialLastCur
 - `resumeFrom` ↔︎ `last_cursor`
 - `seq` ↔︎ `cursor`
 
-## UI components (`state.ui`)
+## UI components (`sharedState.ui`)
 
 Once your backend starts emitting `STATE_SNAPSHOT/STATE_DELTA` with `sharedState.ui`, render by mounting points:
 
@@ -84,4 +84,3 @@ Once your backend starts emitting `STATE_SNAPSHOT/STATE_DELTA` with `sharedState
 - render with `rivu-react` `ComponentRenderer` (or Svelte resolver)
 
 This keeps Zirvox’s existing Chat shell intact; only the “rich UI rendering block” is replaced.
-

@@ -1,4 +1,9 @@
-## ADDED Requirements
+# event-store-snapshot Specification
+
+## Purpose
+Define requirements for server-side event storage and snapshotting needed to support resume/replay and snapshot fallback.
+
+## Requirements
 
 ### Requirement: EventStore supports append and replay by `seq`
 The system MUST provide an EventStore abstraction that can:
@@ -42,4 +47,3 @@ The system MUST support exporting a “structured JSON snapshot” that includes
 #### Scenario: Export can be re-rendered consistently
 - **WHEN** an exported JSON snapshot is imported into a viewer runtime
 - **THEN** the viewer can render `state.ui` deterministically and unknown components degrade gracefully
-

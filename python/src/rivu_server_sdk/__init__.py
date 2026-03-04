@@ -1,4 +1,13 @@
 from .state_ui import UiComponentV1, UiMountV1, UiStateV1
+from .state_ui_patch import (
+    JsonPatchOp,
+    increment_component_revision_v1,
+    mount_component_v1,
+    set_component_v1,
+    set_component_props_v1,
+    set_component_state_v1,
+    unmount_component_v1,
+)
 from .ui_v1_event import UI_V1_EVENT_NAME, UiV1CustomEvent, UiV1EventValue
 from .seq import SeqAllocator
 from .sse import encode_sse_event
@@ -20,6 +29,13 @@ __all__ = [
     "UI_V1_EVENT_NAME",
     "UiV1EventValue",
     "UiV1CustomEvent",
+    "JsonPatchOp",
+    "mount_component_v1",
+    "set_component_v1",
+    "unmount_component_v1",
+    "set_component_props_v1",
+    "set_component_state_v1",
+    "increment_component_revision_v1",
     "UiMountV1",
     "UiComponentV1",
     "UiStateV1",

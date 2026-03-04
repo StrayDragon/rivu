@@ -72,8 +72,9 @@ Use the kernel store + resolver:
 
 ## Guides
 
+- `docs/integration-quickstart.md` — canonical first integration baseline (SSE/WS envelopes, `resumeFrom`, and rendering mounts from `sharedState.ui`)
 - `docs/integration.md` — adoption ladder + kernel/registry usage + UnknownComponent strategy
 - `docs/integration-zirvox.md` — Zirvox WS delta/final/abort → AG-UI + `seq` adapter shape
 - `docs/integration-crystalith.md` — Crystalith SSE chunk/done/error → AG-UI SSE + removing `[[crystalith-ui:v1]]`
-- `docs/export-review.md` — snapshot/export/review + restoring `state.ui` via `STATE_SNAPSHOT`
+- `docs/export-review.md` — snapshot/export/review + restoring `sharedState.ui` via `STATE_SNAPSHOT`
 - `examples/rivu-react-demo` — runnable React demo for viewer + workflow components

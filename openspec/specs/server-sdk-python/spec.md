@@ -1,5 +1,8 @@
-## ADDED Requirements
+# server-sdk-python Specification
 
+## Purpose
+Define requirements for the official Python server SDK: decoding/validating events, allocating `seq`, supporting resume/replay and snapshot fallback, and processing `ui.v1.event` with idempotency and optimistic concurrency.
+## Requirements
 ### Requirement: Python SDK validates and encodes AG-UI events and `ui.v1.event`
 The Python SDK MUST provide strict encode/decode/validate utilities for:
 - AG-UI core events
@@ -36,4 +39,17 @@ The Python SDK MUST provide helper utilities for:
 #### Scenario: Idempotent retry does not duplicate effects
 - **WHEN** the same `clientRequestId` is processed twice
 - **THEN** the SDK returns the original result without reapplying mutations
+
+### Requirement: Python SDK 提供 `sharedState.ui` JSON Patch builder helpers
+Python SDK MUST 提供 helper utilities，用于为常见的 `sharedState.ui` 变更构造 RFC 6902 JSON Patch 操作，而不要求调用方手写 patch JSON。
+
+至少，helpers MUST 覆盖：
+- 将组件 mount/unmount 到 message slot
+- replace/set 组件 props
+- replace/set 组件 state（仅对 stateful 组件）
+- 递增组件 `revision`
+
+#### Scenario: 不手写 JSON 构建 mount patch
+- **WHEN** 服务需要把一个已存在的组件 mount 到 `sharedState.ui.components[componentId].mounts`
+- **THEN** 它可以调用 SDK helper 生成 targeting `/ui/components/<componentId>/mounts` 的 patch operations
 

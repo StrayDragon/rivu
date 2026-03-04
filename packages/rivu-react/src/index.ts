@@ -9,6 +9,9 @@ export { useKernelState } from './use-kernel-state.js';
 export type { ComponentRendererProps } from './component-renderer.js';
 export { ComponentRenderer } from './component-renderer.js';
 
+export type { ProtocolInspectorProps } from './protocol-inspector.js';
+export { ProtocolInspector } from './protocol-inspector.js';
+
 export type { UnknownComponentCardProps } from './unknown-component-card.js';
 export { UnknownComponentCard } from './unknown-component-card.js';
 

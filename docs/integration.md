@@ -2,6 +2,9 @@
 
 Rivu is designed for **progressive adoption**. You can stop at any level.
 
+For the canonical "first integration" baseline (SSE/WS envelopes, `resumeFrom`, and rendering mounts from `sharedState.ui`), start with:
+- `docs/integration-quickstart.md`
+
 ## Adoption Ladder
 
 ### Level 0 — Spec only
@@ -18,7 +21,7 @@ Use `rivu-ui-spec` to validate:
 
 - strict `seq` ordering (`lastSeq`, duplicates dropped, gaps → `needsResync`)
 - shared state merge (`STATE_SNAPSHOT` replace, `STATE_DELTA` JSON Patch)
-- selectors for `state.ui`
+- selectors for `sharedState.ui`
 - outbox for sending `ui.v1.event` (idempotent by `clientRequestId`)
 
 ### Level 2 — Render Primitives + UI kit
@@ -54,9 +57,9 @@ kernel.subscribe(() => { /* rerender */ });
 
 **Kernel does not fetch data.** Your transport layer must resync (replay or snapshot).
 
-## `state.ui` rendering
+## `sharedState.ui` rendering
 
-`state.ui` lives inside kernel `sharedState.ui` and contains:
+`sharedState.ui` contains:
 
 - `components[componentId] = { type, schemaVersion, props, state?, revision, mounts[] }`
 - `mounts[] = { messageId, slot, order }` for placement
@@ -89,7 +92,7 @@ const registry = createRegistry({
 
 Each registration is a whitelist entry:
 
-- `schemaVersion` must match `state.ui.components[componentId].schemaVersion`
+- `schemaVersion` must match `sharedState.ui.components[componentId].schemaVersion`
 - `propsSchema/stateSchema` validate the server-owned data
 - `render(...)` must be pure rendering (no tool execution in browser)
 
@@ -142,7 +145,7 @@ Component types:
 - `LineChart` (`schemaVersion: 1`) — props: `{ title?, unit?, points[] }`
 - `CitationList` (`schemaVersion: 1`) — props: `{ title?, items[] }` (unsafe/invalid URLs are blocked)
 
-Example `state.ui` component entry:
+Example `sharedState.ui` component entry:
 
 ```json
 {
@@ -244,9 +247,75 @@ Both SDKs include a minimal `UiV1EventProcessor` that:
 
 - enforces idempotency via `clientRequestId`
 - rejects revision conflicts (`baseRevision` vs component `revision`)
-- outputs an AG-UI `STATE_DELTA` to update `state.ui.components[componentId].state/revision`
+- outputs an AG-UI `STATE_DELTA` to update `sharedState.ui.components[componentId].state/revision`
 
 Supported component types in the processor (MVP):
 
 - `ApprovalCard` (`approve` / `deny`)
 - `FormCard` (`setField` / `submit`)
+
+### Building `sharedState.ui` patches (mount/props/state/revision)
+
+Both SDKs provide small JSON Patch builder helpers for common `sharedState.ui` updates.
+
+Python (minimal end-to-end snippet):
+
+```py
+from rivu_server_sdk import (
+  set_component_v1, mount_component_v1,
+  set_component_state_v1, increment_component_revision_v1,
+)
+
+component_id = "cmp_form_1"
+
+# 1) Ensure the component exists under sharedState.ui.components
+component = {
+  "type": "FormCard",
+  "schemaVersion": 1,
+  "props": { "title": "Demo form", "fields": [] },
+  "state": { "status": "pending" },
+  "revision": 0,
+  "mounts": [],
+}
+
+patch = []
+patch += set_component_v1(component_id=component_id, component=component)
+
+# 2) Mount it into a message slot
+patch += mount_component_v1(component_id=component_id, message_id="msg_1", slot="inline", order=0)
+
+# 3) Update server-authoritative state + bump revision
+patch += set_component_state_v1(component_id=component_id, state={ "status": "submitted" })
+patch += increment_component_revision_v1(component_id=component_id, current_revision=0)
+
+state_delta_event = { "type": "STATE_DELTA", "delta": patch }
+```
+
+Rust (minimal end-to-end snippet):
+
+```rust
+use rivu_server_sdk::{
+  set_component_v1, mount_component_v1,
+  set_component_state_v1, increment_component_revision_v1,
+};
+use serde_json::json;
+
+let component_id = "cmp_form_1";
+
+let component = json!({
+  "type": "FormCard",
+  "schemaVersion": 1,
+  "props": { "title": "Demo form", "fields": [] },
+  "state": { "status": "pending" },
+  "revision": 0,
+  "mounts": [],
+});
+
+let mut patch = vec![];
+patch.extend(set_component_v1(component_id, component));
+patch.extend(mount_component_v1(component_id, "msg_1", "inline", 0));
+patch.extend(set_component_state_v1(component_id, json!({ "status": "submitted" })));
+patch.extend(increment_component_revision_v1(component_id, 0));
+
+let state_delta_event = json!({ "type": "STATE_DELTA", "delta": patch });
+```

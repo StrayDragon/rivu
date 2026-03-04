@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { createKernel, selectMountedUiComponentsV1, type RivuKernel } from 'rivu-kernel';
-import { ComponentRenderer, createRegistry, useKernelState, viewerRegistryV1, workflowRegistryV1 } from 'rivu-react';
+import { ComponentRenderer, createRegistry, ProtocolInspector, useKernelState, viewerRegistryV1, workflowRegistryV1 } from 'rivu-react';
 
 import { DEMO_MESSAGE_IDS, createBootstrapEnvelopes, createInitialSharedState } from './demo-fixtures.js';
 import { createMockServer } from './mock-server.js';
@@ -69,23 +69,11 @@ function SidebarMounts(props: { kernel: RivuKernel; registry: ReturnType<typeof 
   );
 }
 
-function DebugPanel(props: { kernel: RivuKernel }) {
-  const info = useKernelState(props.kernel, (s) => ({
-    lastSeq: s.lastSeq,
-    needsResync: s.needsResync,
-    resyncReason: s.resyncReason,
-    gap: s.gap,
-    outbox: s.outbox,
-    ui: (s.sharedState as any).ui,
-  }));
-  return <pre>{JSON.stringify(info, null, 2)}</pre>;
-}
-
 export function App() {
   const registry = useMemo(() => createRegistry({ ...viewerRegistryV1, ...workflowRegistryV1 }), []);
 
   const [resetKey, setResetKey] = useState(0);
-  const [showDebug, setShowDebug] = useState(true);
+  const [showInspector, setShowInspector] = useState(true);
 
   const { kernel, bootstrap } = useMemo(() => {
     const sharedState = createInitialSharedState();
@@ -120,10 +108,10 @@ export function App() {
     <div className="app">
       <div className="topbar">
         <div className="brand">Rivu React Demo</div>
-        <div className="hint">Viewer + Workflow components with `state.ui` mounts and a mock server-authoritative loop.</div>
+        <div className="hint">Viewer + Workflow components with `sharedState.ui` mounts and a mock server-authoritative loop.</div>
         <div className="spacer" />
-        <button className="btn" type="button" onClick={() => setShowDebug((v) => !v)}>
-          {showDebug ? 'Hide' : 'Show'} Debug
+        <button className="btn" type="button" onClick={() => setShowInspector((v) => !v)}>
+          {showInspector ? 'Hide' : 'Show'} Inspector
         </button>
         <button className="btn" type="button" onClick={() => setResetKey((k) => k + 1)}>
           Reset
@@ -160,10 +148,9 @@ export function App() {
           <div className="panelBody">
             <SidebarMounts kernel={kernel} registry={registry} messageId={selectedMessageId} />
 
-            {showDebug ? (
+            {showInspector ? (
               <div style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 750, marginBottom: 8 }}>Debug</div>
-                <DebugPanel kernel={kernel} />
+                <ProtocolInspector kernel={kernel} />
               </div>
             ) : null}
           </div>

@@ -143,14 +143,13 @@ export function createBootstrapEnvelopes(sharedState: Record<string, unknown>): 
       event: { type: 'STATE_SNAPSHOT', snapshot: sharedState },
     },
     { seq: 2, event: { type: 'TEXT_MESSAGE_START', messageId: DEMO_MESSAGE_IDS.user1, role: 'user' } },
-    { seq: 3, event: { type: 'TEXT_MESSAGE_CONTENT', messageId: DEMO_MESSAGE_IDS.user1, delta: 'Show me a compact report with charts and a couple of interactive steps.' } },
+    { seq: 3, event: { type: 'TEXT_MESSAGE_CHUNK', messageId: DEMO_MESSAGE_IDS.user1, role: 'user', delta: 'Show me a compact report with charts and a couple of interactive steps.' } },
     { seq: 4, event: { type: 'TEXT_MESSAGE_END', messageId: DEMO_MESSAGE_IDS.user1 } },
     { seq: 5, event: { type: 'TEXT_MESSAGE_START', messageId: DEMO_MESSAGE_IDS.assistant1, role: 'assistant' } },
-    { seq: 6, event: { type: 'TEXT_MESSAGE_CONTENT', messageId: DEMO_MESSAGE_IDS.assistant1, delta: 'Here is a viewer-style summary. Some cards are mounted inline, others in the sidebar.' } },
+    { seq: 6, event: { type: 'TEXT_MESSAGE_CHUNK', messageId: DEMO_MESSAGE_IDS.assistant1, role: 'assistant', delta: 'Here is a viewer-style summary. Some cards are mounted inline, others in the sidebar.' } },
     { seq: 7, event: { type: 'TEXT_MESSAGE_END', messageId: DEMO_MESSAGE_IDS.assistant1 } },
     { seq: 8, event: { type: 'TEXT_MESSAGE_START', messageId: DEMO_MESSAGE_IDS.assistant2, role: 'assistant' } },
-    { seq: 9, event: { type: 'TEXT_MESSAGE_CONTENT', messageId: DEMO_MESSAGE_IDS.assistant2, delta: 'Next, try the workflow components below (server-authoritative state via ui.v1.event).' } },
+    { seq: 9, event: { type: 'TEXT_MESSAGE_CHUNK', messageId: DEMO_MESSAGE_IDS.assistant2, role: 'assistant', delta: 'Next, try the workflow components below (server-authoritative state via ui.v1.event).' } },
     { seq: 10, event: { type: 'TEXT_MESSAGE_END', messageId: DEMO_MESSAGE_IDS.assistant2 } },
   ];
 }
-

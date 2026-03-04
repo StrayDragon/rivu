@@ -17,6 +17,8 @@ test('dispatch: seq duplicate and gap', () => {
   expect(rGap).toEqual({ status: 'gap', expectedSeq: 2, gotSeq: 3 });
   expect(kernel.getState().lastSeq).toBe(1);
   expect(kernel.getState().needsResync).toBe(true);
+  expect(kernel.getState().resyncReason).toBe('gap');
+  expect(kernel.getState().gap).toEqual({ expectedSeq: 2, gotSeq: 3 });
 });
 
 test('dispatch: patch error triggers resync without advancing lastSeq', () => {
@@ -38,6 +40,8 @@ test('dispatch: patch error triggers resync without advancing lastSeq', () => {
   expect(r2).toEqual({ status: 'needs_resync', reason: 'patch_error' });
   expect(kernel.getState().lastSeq).toBe(1);
   expect(kernel.getState().needsResync).toBe(true);
+  expect(kernel.getState().resyncReason).toBe('patch_error');
+  expect(kernel.getState().gap).toBe(null);
 });
 
 test('dispatch: unknown custom event name is rejected by default', () => {
@@ -81,4 +85,3 @@ test('send: deduplicates by clientRequestId and updates outbox status', async ()
   const r3 = await kernel.send(action);
   expect(r3).toEqual({ status: 'duplicate', clientRequestId: 'req_1' });
 });
-

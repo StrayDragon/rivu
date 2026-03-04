@@ -1,4 +1,9 @@
-## ADDED Requirements
+# seq-resume Specification
+
+## Purpose
+Define requirements for `seq` ordering and `resumeFrom`-based resume semantics across transports (SSE and WebSocket wrappers).
+
+## Requirements
 
 ### Requirement: Every streamed event MUST have a monotonically increasing `seq`
 For any transport used between server and client (SSE or WebSocket wrapper), each delivered unit MUST carry a `seq` value that is a positive integer and is monotonically increasing for a given stream.
@@ -35,4 +40,3 @@ When a gap is detected, the client MUST NOT apply the out-of-order envelope and 
 #### Scenario: Gap detection
 - **WHEN** a client has applied `lastSeq = 100` and receives an envelope with `seq = 102`
 - **THEN** the client detects a gap and triggers resynchronization instead of applying `seq = 102`
-

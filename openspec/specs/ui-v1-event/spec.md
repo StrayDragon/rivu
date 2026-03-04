@@ -1,5 +1,8 @@
-## ADDED Requirements
+# ui-v1-event Specification
 
+## Purpose
+Define requirements for `CUSTOM(name="ui.v1.event")` interactions and the shape of renderable UI state stored under the shared state (`state.ui` / `sharedState.ui`).
+## Requirements
 ### Requirement: UI interactions use `CUSTOM(name="ui.v1.event")`
 The system MUST represent client→server UI interactions as an AG-UI `CUSTOM` event with `name` exactly equal to `ui.v1.event`.
 
@@ -21,45 +24,45 @@ The system MUST reject `ui.v1.event` messages that fail schema validation.
 - **THEN** the SDK validators reject the event as invalid
 
 ### Requirement: UI state is stored under `state.ui` (v1)
-The system MUST store renderable UI component data inside the AG-UI shared state at `state.ui`.
+系统 MUST 将可渲染的 UI 组件数据存放在 AG-UI shared state 的顶层 key `ui` 下（即 `sharedState.ui`）。
 
-`state.ui` MUST be an object with:
+`sharedState.ui` MUST 是一个对象，包含：
 - `v`: integer equal to `1`
 - `components`: an object map keyed by `componentId`
 
-Each `state.ui.components[componentId]` entry MUST contain:
+每个 `sharedState.ui.components[componentId]` 条目 MUST 包含：
 - `type`: non-empty string (component type identifier)
 - `schemaVersion`: positive integer
 - `props`: JSON object
 - `revision`: non-negative integer
 - `mounts`: array of mount objects
 
-Each mount object MUST contain:
+每个 mount 对象 MUST 包含：
 - `messageId`: non-empty string
 - `slot`: non-empty string
 - `order`: number
 
-If a component is stateful, it MUST also contain:
+如果组件是 stateful，它 MUST 还包含：
 - `state`: JSON object (server-authoritative persisted state)
 
-If a component is stateless, the `state` field MAY be omitted.
+如果组件是 stateless，则 `state` 字段 MAY 省略。
 
 #### Scenario: `STATE_SNAPSHOT` can fully restore UI
-- **WHEN** a `STATE_SNAPSHOT` event is received whose `snapshot` contains a valid `state.ui` object
-- **THEN** a consumer can reconstruct the full set of UI components and mounts from `state.ui.components`
+- **WHEN** 收到一个 `STATE_SNAPSHOT`，其 `snapshot` 包含合法的 `ui` 对象
+- **THEN** 使用方可以仅通过 `sharedState.ui.components` 还原完整的 UI 组件与 mounts
 
 ### Requirement: Revisions support optimistic concurrency
-For any stateful component, the server MUST treat `state.ui.components[componentId].revision` as the authoritative revision.
+对于任何 stateful 组件，服务端 MUST 将 `sharedState.ui.components[componentId].revision` 视为权威 revision。
 
-For any `ui.v1.event` that intends to mutate server-authoritative component state, the server MUST compare `baseRevision` against the current `revision` and MUST NOT apply the mutation when they differ.
+对于任何意图修改 server-authoritative 组件状态的 `ui.v1.event`，服务端 MUST 将 `baseRevision` 与当前 `revision` 进行比较，并且在不一致时 MUST NOT 应用该变更。
 
 #### Scenario: Accept matching `baseRevision`
-- **WHEN** a `ui.v1.event` is processed with `baseRevision` equal to the current component `revision`
-- **THEN** the server may accept and apply the change and emit a `STATE_DELTA` or `STATE_SNAPSHOT` reflecting the new `revision`
+- **WHEN** 处理 `ui.v1.event` 时 `baseRevision` 等于当前组件的 `revision`
+- **THEN** 服务端可以接受并应用该变更，并发送反映新 `revision` 的 `STATE_DELTA` 或 `STATE_SNAPSHOT`
 
 #### Scenario: Reject conflicting `baseRevision`
-- **WHEN** a `ui.v1.event` is processed with `baseRevision` not equal to the current component `revision`
-- **THEN** the server rejects the change and the client can be resynchronized via replay or `STATE_SNAPSHOT`
+- **WHEN** 处理 `ui.v1.event` 时 `baseRevision` 不等于当前组件的 `revision`
+- **THEN** 服务端拒绝该变更，客户端可通过 replay 或 `STATE_SNAPSHOT` 重同步
 
 ### Requirement: `ui.v1.event` inputs are treated as untrusted
 SDK validators MUST support configurable limits for decoding `ui.v1.event` payloads (including maximum bytes and maximum nesting depth).

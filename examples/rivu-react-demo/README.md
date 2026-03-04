@@ -18,7 +18,7 @@ pnpm -C examples/rivu-react-demo dev
 ## What to look at
 
 - `src/App.tsx` — chat-like layout + `<ComponentRenderer kernel registry />`
-- `src/demo-fixtures.ts` — `state.ui` fixture + bootstrap envelopes (seq-ordered)
+- `src/demo-fixtures.ts` — `sharedState.ui` fixture + bootstrap envelopes (seq-ordered)
 - `src/mock-server.ts` — in-browser mock server that enforces:
   - idempotency by `clientRequestId`
   - concurrency by `baseRevision == component.revision`
@@ -28,4 +28,3 @@ pnpm -C examples/rivu-react-demo dev
 
 - The mock server runs in the same process as the UI for demo purposes only.
 - For real resume/store/snapshot, use the Python/Rust server SDKs (`docs/integration.md`).
-

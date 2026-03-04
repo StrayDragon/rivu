@@ -2,7 +2,7 @@
 
 Viewer use-cases (Crystalith profile) require:
 
-- stable replay of `state.ui`
+- stable replay of `sharedState.ui`
 - ability to export a **structured JSON snapshot**
 - refresh/reconnect restoring UI without re-running tools
 
@@ -28,7 +28,7 @@ Minimum requirement for rich UI replay:
 
 - `sharedState.ui` must exist and validate as `UiStateV1`
 
-## Restoring `state.ui` via `STATE_SNAPSHOT`
+## Restoring `sharedState.ui` via `STATE_SNAPSHOT`
 
 To restore in the browser:
 
@@ -60,4 +60,3 @@ After this, UI components can be rendered deterministically from `sharedState.ui
 
 - **Resume** needs a short replay window (`InMemoryRingBufferEventStore`) for quick reconnects.
 - **Export/review** should rely on **snapshots** (bounded replay budget) and stable component schemas.
-
