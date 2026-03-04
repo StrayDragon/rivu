@@ -1,0 +1,558 @@
+{
+  "version": 1,
+  "uiV1Event": {
+    "valid": [
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.event",
+        "value": {
+          "componentId": "cmp_1",
+          "eventName": "submit",
+          "payload": {},
+          "clientRequestId": "req_1",
+          "baseRevision": 0
+        }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.event",
+        "value": {
+          "componentId": "cmp_form",
+          "eventName": "setField",
+          "payload": {
+            "field": "email",
+            "value": "a@example.com",
+            "meta": {
+              "touched": true,
+              "attempts": [1, 2]
+            }
+          },
+          "clientRequestId": "req_2",
+          "baseRevision": 3
+        }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.event",
+        "timestamp": 1710000000,
+        "traceId": "trace_1",
+        "value": {
+          "componentId": "cmp_approval",
+          "eventName": "approve",
+          "payload": {
+            "comment": "ok"
+          },
+          "clientRequestId": "req_3",
+          "baseRevision": 10
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.event",
+        "value": {
+          "componentId": "cmp_1",
+          "eventName": "submit",
+          "payload": {},
+          "baseRevision": 0
+        }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.event",
+        "value": {
+          "componentId": "",
+          "eventName": "submit",
+          "payload": {},
+          "clientRequestId": "req_bad",
+          "baseRevision": 0
+        }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.event",
+        "value": {
+          "componentId": "cmp_1",
+          "eventName": "submit",
+          "payload": {},
+          "clientRequestId": "req_bad",
+          "baseRevision": -1
+        }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.event",
+        "value": {
+          "componentId": "cmp_1",
+          "eventName": "submit",
+          "payload": [],
+          "clientRequestId": "req_bad",
+          "baseRevision": 0
+        }
+      },
+      {
+        "type": "STATE_SNAPSHOT",
+        "name": "ui.v1.event",
+        "value": {
+          "componentId": "cmp_1",
+          "eventName": "submit",
+          "payload": {},
+          "clientRequestId": "req_bad",
+          "baseRevision": 0
+        }
+      },
+      {
+        "type": "CUSTOM",
+        "name": "ui.v1.unknown",
+        "value": {
+          "componentId": "cmp_1",
+          "eventName": "submit",
+          "payload": {},
+          "clientRequestId": "req_bad",
+          "baseRevision": 0
+        }
+      }
+    ]
+  },
+  "uiStateV1": {
+    "valid": [
+      {
+        "v": 1,
+        "components": {
+          "cmp_table": {
+            "type": "DataTable",
+            "schemaVersion": 1,
+            "props": {
+              "columns": ["A"],
+              "rows": [[1]]
+            },
+            "revision": 0,
+            "mounts": [
+              {
+                "messageId": "msg_1",
+                "slot": "inline",
+                "order": 0
+              }
+            ]
+          }
+        }
+      },
+      {
+        "v": 1,
+        "meta": {
+          "note": "extra fields allowed"
+        },
+        "components": {
+          "cmp_approval": {
+            "type": "ApprovalCard",
+            "schemaVersion": 1,
+            "props": {
+              "title": "Refund",
+              "description": "Approve or deny"
+            },
+            "state": {
+              "status": "pending"
+            },
+            "revision": 3,
+            "mounts": [
+              {
+                "messageId": "msg_2",
+                "slot": "inline",
+                "order": 0
+              }
+            ],
+            "extraField": 123
+          }
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "v": 0,
+        "components": {}
+      },
+      {
+        "v": 1,
+        "components": {
+          "": {
+            "type": "DataTable",
+            "schemaVersion": 1,
+            "props": {},
+            "revision": 0,
+            "mounts": [
+              {
+                "messageId": "msg_1",
+                "slot": "inline",
+                "order": 0
+              }
+            ]
+          }
+        }
+      },
+      {
+        "v": 1,
+        "components": {
+          "cmp_bad": {
+            "schemaVersion": 1,
+            "props": {},
+            "revision": 0,
+            "mounts": [
+              {
+                "messageId": "msg_1",
+                "slot": "inline",
+                "order": 0
+              }
+            ]
+          }
+        }
+      },
+      {
+        "v": 1,
+        "components": {
+          "cmp_bad": {
+            "type": "DataTable",
+            "schemaVersion": 1,
+            "props": {},
+            "revision": 0,
+            "mounts": [
+              {
+                "messageId": "msg_1",
+                "slot": "",
+                "order": 0
+              }
+            ]
+          }
+        }
+      },
+      {
+        "v": 1,
+        "components": {
+          "cmp_bad": {
+            "type": "DataTable",
+            "schemaVersion": 1,
+            "props": {},
+            "revision": -1,
+            "mounts": [
+              {
+                "messageId": "msg_1",
+                "slot": "inline",
+                "order": 0
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "reduce": [
+    {
+      "id": "snapshot_basic",
+      "envelopes": [
+        {
+          "seq": 1,
+          "event": {
+            "type": "STATE_SNAPSHOT",
+            "snapshot": {
+              "ui": {
+                "v": 1,
+                "components": {
+                  "cmp_metric": {
+                    "type": "MetricCard",
+                    "schemaVersion": 1,
+                    "props": {
+                      "label": "Revenue",
+                      "value": 1
+                    },
+                    "revision": 0,
+                    "mounts": [
+                      {
+                        "messageId": "msg_1",
+                        "slot": "inline",
+                        "order": 0
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expect": {
+        "status": "ok",
+        "lastSeq": 1,
+        "needsResync": false,
+        "sharedState": {
+          "ui": {
+            "v": 1,
+            "components": {
+              "cmp_metric": {
+                "type": "MetricCard",
+                "schemaVersion": 1,
+                "props": {
+                  "label": "Revenue",
+                  "value": 1
+                },
+                "revision": 0,
+                "mounts": [
+                  {
+                    "messageId": "msg_1",
+                    "slot": "inline",
+                    "order": 0
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "delta_replace",
+      "envelopes": [
+        {
+          "seq": 1,
+          "event": {
+            "type": "STATE_SNAPSHOT",
+            "snapshot": {
+              "ui": {
+                "v": 1,
+                "components": {
+                  "cmp_metric": {
+                    "type": "MetricCard",
+                    "schemaVersion": 1,
+                    "props": {
+                      "label": "Revenue",
+                      "value": 1
+                    },
+                    "revision": 0,
+                    "mounts": [
+                      {
+                        "messageId": "msg_1",
+                        "slot": "inline",
+                        "order": 0
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "seq": 2,
+          "event": {
+            "type": "STATE_DELTA",
+            "delta": [
+              {
+                "op": "replace",
+                "path": "/ui/components/cmp_metric/props/value",
+                "value": 2
+              }
+            ]
+          }
+        }
+      ],
+      "expect": {
+        "status": "ok",
+        "lastSeq": 2,
+        "needsResync": false,
+        "sharedState": {
+          "ui": {
+            "v": 1,
+            "components": {
+              "cmp_metric": {
+                "type": "MetricCard",
+                "schemaVersion": 1,
+                "props": {
+                  "label": "Revenue",
+                  "value": 2
+                },
+                "revision": 0,
+                "mounts": [
+                  {
+                    "messageId": "msg_1",
+                    "slot": "inline",
+                    "order": 0
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "duplicate_seq_discard",
+      "envelopes": [
+        {
+          "seq": 1,
+          "event": {
+            "type": "STATE_SNAPSHOT",
+            "snapshot": {
+              "ui": {
+                "v": 1,
+                "components": {}
+              }
+            }
+          }
+        },
+        {
+          "seq": 1,
+          "event": {
+            "type": "STATE_DELTA",
+            "delta": [
+              {
+                "op": "add",
+                "path": "/ui/components/cmp_table",
+                "value": {
+                  "type": "DataTable",
+                  "schemaVersion": 1,
+                  "props": {
+                    "columns": ["A"],
+                    "rows": [[1]]
+                  },
+                  "revision": 0,
+                  "mounts": [
+                    {
+                      "messageId": "msg_1",
+                      "slot": "inline",
+                      "order": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "expect": {
+        "status": "ok",
+        "lastSeq": 1,
+        "needsResync": false,
+        "sharedState": {
+          "ui": {
+            "v": 1,
+            "components": {}
+          }
+        }
+      }
+    },
+    {
+      "id": "gap_requires_resync",
+      "envelopes": [
+        {
+          "seq": 1,
+          "event": {
+            "type": "STATE_SNAPSHOT",
+            "snapshot": {
+              "ui": {
+                "v": 1,
+                "components": {}
+              }
+            }
+          }
+        },
+        {
+          "seq": 3,
+          "event": {
+            "type": "STATE_DELTA",
+            "delta": []
+          }
+        }
+      ],
+      "expect": {
+        "status": "gap",
+        "lastSeq": 1,
+        "needsResync": true,
+        "gap": {
+          "expectedSeq": 2,
+          "gotSeq": 3
+        },
+        "sharedState": {
+          "ui": {
+            "v": 1,
+            "components": {}
+          }
+        }
+      }
+    },
+    {
+      "id": "patch_error_requires_resync",
+      "envelopes": [
+        {
+          "seq": 1,
+          "event": {
+            "type": "STATE_SNAPSHOT",
+            "snapshot": {
+              "ui": {
+                "v": 1,
+                "components": {
+                  "cmp_metric": {
+                    "type": "MetricCard",
+                    "schemaVersion": 1,
+                    "props": {
+                      "label": "Revenue",
+                      "value": 1
+                    },
+                    "revision": 0,
+                    "mounts": [
+                      {
+                        "messageId": "msg_1",
+                        "slot": "inline",
+                        "order": 0
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "seq": 2,
+          "event": {
+            "type": "STATE_DELTA",
+            "delta": [
+              {
+                "op": "replace",
+                "path": "/ui/components/cmp_metric/props/missing",
+                "value": 123
+              }
+            ]
+          }
+        }
+      ],
+      "expect": {
+        "status": "patch_error",
+        "lastSeq": 1,
+        "needsResync": true,
+        "sharedState": {
+          "ui": {
+            "v": 1,
+            "components": {
+              "cmp_metric": {
+                "type": "MetricCard",
+                "schemaVersion": 1,
+                "props": {
+                  "label": "Revenue",
+                  "value": 1
+                },
+                "revision": 0,
+                "mounts": [
+                  {
+                    "messageId": "msg_1",
+                    "slot": "inline",
+                    "order": 0
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
+

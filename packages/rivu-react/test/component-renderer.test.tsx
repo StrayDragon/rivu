@@ -1,0 +1,141 @@
+// @vitest-environment jsdom
+import { render, screen, act } from '@testing-library/react';
+import { z } from 'zod';
+import { expect, test } from 'vitest';
+
+import { createKernel } from 'rivu-kernel';
+
+import { ComponentRenderer, createRegistry, useKernelState } from '../src/index.js';
+
+test('ComponentRenderer renders registered component and updates on STATE_DELTA', () => {
+  const kernel = createKernel();
+
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_metric: {
+              type: 'MetricCard',
+              schemaVersion: 1,
+              props: { label: 'Revenue', value: 1 },
+              revision: 0,
+              mounts: [{ messageId: 'msg_1', slot: 'inline', order: 0 }],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const registry = createRegistry({
+    MetricCard: {
+      schemaVersion: 1,
+      propsSchema: z.object({ label: z.string(), value: z.number() }).strict(),
+      render: ({ props }) => (
+        <div data-testid="metric">
+          {props.label}:{props.value}
+        </div>
+      ),
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_metric" />);
+  expect(screen.getByTestId('metric').textContent).toBe('Revenue:1');
+
+  act(() => {
+    kernel.dispatch({
+      seq: 2,
+      event: {
+        type: 'STATE_DELTA',
+        delta: [{ op: 'replace', path: '/ui/components/cmp_metric/props/value', value: 2 }],
+      },
+    });
+  });
+
+  expect(screen.getByTestId('metric').textContent).toBe('Revenue:2');
+});
+
+test('ComponentRenderer degrades on unknown component type', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_unknown: {
+              type: 'UnknownThing',
+              schemaVersion: 1,
+              props: {},
+              revision: 0,
+              mounts: [{ messageId: 'msg_1', slot: 'inline', order: 0 }],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} registry={createRegistry({})} componentId="cmp_unknown" />);
+  expect(screen.getByText('Unknown component type')).toBeTruthy();
+});
+
+test('ComponentRenderer degrades on invalid props', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_bad: {
+              type: 'MetricCard',
+              schemaVersion: 1,
+              props: { label: 'Revenue', value: 'oops' },
+              revision: 0,
+              mounts: [{ messageId: 'msg_1', slot: 'inline', order: 0 }],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const registry = createRegistry({
+    MetricCard: {
+      schemaVersion: 1,
+      propsSchema: z.object({ label: z.string(), value: z.number() }).strict(),
+      render: () => <div data-testid="metric" />,
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_bad" />);
+  expect(screen.getByText('Invalid component props')).toBeTruthy();
+});
+
+test('useKernelState subscribes and re-renders', () => {
+  const kernel = createKernel();
+
+  function View() {
+    const lastSeq = useKernelState(kernel, (s) => s.lastSeq);
+    return <div data-testid="seq">{lastSeq}</div>;
+  }
+
+  render(<View />);
+  expect(screen.getByTestId('seq').textContent).toBe('0');
+
+  act(() => {
+    kernel.dispatch({ seq: 1, event: { type: 'STATE_SNAPSHOT', snapshot: {} } });
+  });
+
+  expect(screen.getByTestId('seq').textContent).toBe('1');
+});
+
