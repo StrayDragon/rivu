@@ -3,6 +3,7 @@ mod seq;
 mod sse;
 mod event_store;
 mod snapshot_store;
+mod event_compactor;
 mod resume;
 mod ui_v1_event_processor;
 mod state_ui_patch;
@@ -22,6 +23,9 @@ pub use seq::{SeqAllocator, SeqError};
 pub use sse::{encode_sse_event, SseError};
 pub use event_store::{Envelope, EventStoreError, InMemoryRingBufferEventStore, ReplayResult};
 pub use snapshot_store::{Snapshot, SnapshotStoreError, SqliteSnapshotStore};
+pub use event_compactor::{
+    CompactingEventSink, DefaultEventCompactor, EventCompactor, EventCompactorConfig, EventCompactorError, EventCompactorMetrics,
+};
 pub use resume::{resume_replay, ResumeError, ResumeKind, ResumeResult};
 pub use ui_v1_event_processor::{AuthorizeHook, ProcessedResult, UiV1EventProcessor, UiV1EventProcessorError};
 

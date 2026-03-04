@@ -29,6 +29,12 @@ from .sse import encode_sse_event
 from .event_store import Envelope, InMemoryRingBufferEventStore, ReplayResult
 from .snapshot_store import Snapshot, SqliteSnapshotStore
 from .resume import ResumeKind, ResumeResult, resume_replay
+from .event_compactor import (
+    CompactingEventSink,
+    DefaultEventCompactor,
+    EventCompactorConfig,
+    EventCompactorMetrics,
+)
 from .ui_v1_event_processor import (
     AuthorizationError,
     InvalidPayloadError,
@@ -79,6 +85,10 @@ __all__ = [
     "InMemoryRingBufferEventStore",
     "Snapshot",
     "SqliteSnapshotStore",
+    "EventCompactorConfig",
+    "EventCompactorMetrics",
+    "DefaultEventCompactor",
+    "CompactingEventSink",
     "ResumeKind",
     "ResumeResult",
     "resume_replay",

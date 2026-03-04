@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import * as fastJsonPatch from 'fast-json-patch';
 import { createKernel, selectMountedUiComponentsV1, type RivuKernel } from 'rivu-kernel';
 import {
   ComponentRenderer,
@@ -196,6 +197,247 @@ function ExportMenu(props: { kernel: RivuKernel; registry: ReturnType<typeof cre
   );
 }
 
+type DemoEnvelope = { seq: number; event: { type: string; [k: string]: unknown } };
+
+type LongRunReport = {
+  rawEvents: number;
+  compactedEvents: number;
+  rawSnapshots: number;
+  compactedSnapshots: number;
+  resumeFrom: number;
+  rawResumeKind: 'replay' | 'snapshot';
+  compactedResumeKind: 'replay' | 'snapshot';
+  rawEnvelopesToSend: number;
+  compactedEnvelopesToSend: number;
+};
+
+function replayAfter(envelopes: DemoEnvelope[], afterSeq: number): { complete: boolean; envelopes: DemoEnvelope[] } {
+  const sorted = [...envelopes].sort((a, b) => a.seq - b.seq);
+  const filtered = sorted.filter((e) => e.seq > afterSeq);
+  if (!filtered.length) return { complete: true, envelopes: [] };
+
+  const expectedFirst = afterSeq + 1;
+  if (filtered[0].seq !== expectedFirst) return { complete: false, envelopes: [] };
+
+  const out: DemoEnvelope[] = [];
+  let expected = expectedFirst;
+  for (const env of filtered) {
+    if (env.seq !== expected) return { complete: false, envelopes: [] };
+    out.push(env);
+    expected += 1;
+  }
+  return { complete: true, envelopes: out };
+}
+
+function compactEnvelopesV1(envelopes: DemoEnvelope[], config: { maxReplayEvents: number }): DemoEnvelope[] {
+  const sorted = [...envelopes].sort((a, b) => a.seq - b.seq);
+  const out: DemoEnvelope[] = [];
+
+  let sharedState: Record<string, unknown> = {};
+  let stateDeltasSinceSnapshot = 0;
+
+  for (const env of sorted) {
+    const e = env.event;
+
+    const last = out[out.length - 1];
+    if (e.type === 'TEXT_MESSAGE_CHUNK' && last?.event.type === 'TEXT_MESSAGE_CHUNK') {
+      const messageId = (e as any).messageId;
+      const lastMessageId = (last.event as any).messageId;
+      const role = (e as any).role;
+      const lastRole = (last.event as any).role;
+      if (typeof messageId === 'string' && messageId === lastMessageId && String(role ?? 'assistant') === String(lastRole ?? 'assistant')) {
+        const prev = String((last.event as any).delta ?? '');
+        const next = String((e as any).delta ?? '');
+        (last.event as any).delta = `${prev}${next}`;
+        last.seq = env.seq;
+        continue;
+      }
+    }
+
+    if (e.type === 'TOOL_CALL_CHUNK' && last?.event.type === 'TOOL_CALL_CHUNK') {
+      const toolCallId = (e as any).toolCallId;
+      const lastToolCallId = (last.event as any).toolCallId;
+      if (typeof toolCallId === 'string' && toolCallId === lastToolCallId) {
+        const name = (e as any).toolCallName;
+        const lastName = (last.event as any).toolCallName;
+        if (typeof name === 'string' && typeof lastName === 'string' && name && lastName && name !== lastName) {
+          // incompatible metadata: don't merge
+        } else {
+          const parent = (e as any).parentMessageId;
+          const lastParent = (last.event as any).parentMessageId;
+          if (typeof parent === 'string' && typeof lastParent === 'string' && parent && lastParent && parent !== lastParent) {
+            // incompatible metadata: don't merge
+          } else {
+            const prev = String((last.event as any).delta ?? '');
+            const next = String((e as any).delta ?? '');
+            (last.event as any).delta = `${prev}${next}`;
+            if (!lastName && typeof name === 'string' && name) (last.event as any).toolCallName = name;
+            if (!lastParent && typeof parent === 'string' && parent) (last.event as any).parentMessageId = parent;
+            last.seq = env.seq;
+            continue;
+          }
+        }
+      }
+    }
+
+    out.push({ seq: env.seq, event: structuredClone(env.event) });
+
+    if (e.type === 'STATE_SNAPSHOT') {
+      const snapshot = (e as any).snapshot;
+      if (snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)) {
+        sharedState = structuredClone(snapshot);
+        stateDeltasSinceSnapshot = 0;
+      }
+      continue;
+    }
+
+    if (e.type === 'STATE_DELTA') {
+      const delta = (e as any).delta;
+      if (Array.isArray(delta)) {
+        const result = fastJsonPatch.applyPatch(sharedState, delta as any[], true, false);
+        const next = result.newDocument as unknown;
+        if (next && typeof next === 'object' && !Array.isArray(next)) {
+          sharedState = next as Record<string, unknown>;
+          stateDeltasSinceSnapshot += 1;
+        }
+      }
+
+      if (config.maxReplayEvents > 0 && stateDeltasSinceSnapshot > config.maxReplayEvents) {
+        let lastSnapshotSeq = 0;
+        for (let i = out.length - 1; i >= 0; i -= 1) {
+          const t = (out[i].event as any).type;
+          if (t === 'STATE_SNAPSHOT') {
+            lastSnapshotSeq = out[i].seq;
+            break;
+          }
+        }
+
+        const retained = out.filter((x) => {
+          const t = (x.event as any).type;
+          return t !== 'STATE_DELTA' || x.seq <= lastSnapshotSeq;
+        });
+        retained.push({ seq: env.seq, event: { type: 'STATE_SNAPSHOT', snapshot: structuredClone(sharedState) } as any });
+
+        out.length = 0;
+        out.push(...retained);
+        stateDeltasSinceSnapshot = 0;
+      }
+    }
+  }
+
+  return out;
+}
+
+function runLongRunSimulation(): LongRunReport {
+  const raw: DemoEnvelope[] = [];
+  let seq = 0;
+  const push = (event: DemoEnvelope['event']) => {
+    seq += 1;
+    raw.push({ seq, event });
+  };
+
+  push({ type: 'STATE_SNAPSHOT', snapshot: { ui: { v: 1, components: {} }, k: 0 } });
+
+  const chunks = 1200;
+  for (let i = 0; i < chunks; i += 1) {
+    push({ type: 'TEXT_MESSAGE_CHUNK', messageId: 'msg_long', role: 'assistant', delta: 'x' });
+  }
+
+  const toolChunks = 800;
+  for (let i = 0; i < toolChunks; i += 1) {
+    push({ type: 'TOOL_CALL_CHUNK', toolCallId: 'tc_long', toolCallName: 'search', parentMessageId: 'msg_long', delta: 'y' });
+  }
+
+  const deltas = 900;
+  for (let i = 1; i <= deltas; i += 1) {
+    push({ type: 'STATE_DELTA', delta: [{ op: 'replace', path: '/k', value: i }] });
+  }
+
+  const compacted = compactEnvelopesV1(raw, { maxReplayEvents: 200 });
+
+  const resumeFrom = 0;
+  const rawReplay = replayAfter(raw, resumeFrom);
+  const compactReplay = replayAfter(compacted, resumeFrom);
+
+  const rawResumeKind: LongRunReport['rawResumeKind'] = rawReplay.complete ? 'replay' : 'snapshot';
+  const compactedResumeKind: LongRunReport['compactedResumeKind'] = compactReplay.complete ? 'replay' : 'snapshot';
+
+  const rawSnapshots = raw.filter((e) => e.event.type === 'STATE_SNAPSHOT').length;
+  const compactedSnapshots = compacted.filter((e) => e.event.type === 'STATE_SNAPSHOT').length;
+
+  return {
+    rawEvents: raw.length,
+    compactedEvents: compacted.length,
+    rawSnapshots,
+    compactedSnapshots,
+    resumeFrom,
+    rawResumeKind,
+    compactedResumeKind,
+    rawEnvelopesToSend: rawReplay.complete ? rawReplay.envelopes.length : 1,
+    compactedEnvelopesToSend: compactReplay.complete ? compactReplay.envelopes.length : 1,
+  };
+}
+
+function LongRunMenu() {
+  const [report, setReport] = useState<LongRunReport | null>(null);
+
+  return (
+    <details style={{ position: 'relative' }}>
+      <summary className="btn" style={{ listStyle: 'none' }}>
+        Long Run
+      </summary>
+      <div
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: 'calc(100% + 8px)',
+          zIndex: 50,
+          minWidth: 260,
+          padding: 10,
+          borderRadius: 12,
+          border: '1px solid var(--rivu-border, #e5e7eb)',
+          background: 'var(--rivu-bg, #fff)',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <button
+          className="btn"
+          type="button"
+          onClick={() => {
+            setReport(runLongRunSimulation());
+          }}
+        >
+          Run simulation
+        </button>
+
+        {report ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+            <div>
+              Persisted envelopes: <b>{report.rawEvents.toLocaleString()}</b> → <b>{report.compactedEvents.toLocaleString()}</b>
+            </div>
+            <div>
+              Snapshots: <b>{report.rawSnapshots}</b> → <b>{report.compactedSnapshots}</b>
+            </div>
+            <div>
+              ResumeFrom={report.resumeFrom}: raw=<b>{report.rawResumeKind}</b> ({report.rawEnvelopesToSend.toLocaleString()} envelopes)
+            </div>
+            <div>
+              ResumeFrom={report.resumeFrom}: compacted=<b>{report.compactedResumeKind}</b> ({report.compactedEnvelopesToSend.toLocaleString()} envelopes)
+            </div>
+            <div style={{ opacity: 0.75, lineHeight: 1.35 }}>
+              Note: compaction can introduce seq gaps; when replay is not contiguous, servers should fall back to a single{' '}
+              <code>STATE_SNAPSHOT</code>.
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
 export function App() {
   const registry = useMemo(
     () =>
@@ -314,6 +556,7 @@ export function App() {
         <div className="brand">Rivu React Demo</div>
         <div className="hint">Viewer + Workflow components with `sharedState.ui` mounts and a mock server-authoritative loop.</div>
         <div className="spacer" />
+        <LongRunMenu />
         <ExportMenu kernel={kernel} registry={registry} />
         <button
           className="btn"

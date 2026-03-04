@@ -277,6 +277,9 @@ See:
 
 ## Server SDK (Python/Rust) quickstart
 
+See also:
+- `docs/event-compaction.md` (server-side flush/compaction + snapshot tuning)
+
 ### Resume path (ring-buffer → snapshot fallback)
 
 The recommended server pattern is:

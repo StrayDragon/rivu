@@ -798,7 +798,7 @@ fn apply_single_patch_op(doc: &mut Value, op: &Map<String, Value>) -> Result<(),
     }
 }
 
-fn apply_json_patch(doc: &Value, delta: &[Value]) -> Result<Value, ()> {
+pub(crate) fn apply_json_patch(doc: &Value, delta: &[Value]) -> Result<Value, ()> {
     let mut next = doc.clone();
     for item in delta {
         let op = item.as_object().ok_or(())?;
