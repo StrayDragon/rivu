@@ -5,8 +5,9 @@ import { createKernel, selectMountedUiComponentsV1, type RivuKernelState } from 
 
 import type { UiComponentV1 } from 'rivu-ui-spec';
 
-import { createRegistry } from './registry.js';
-import type { RivuComponentRegistry } from './registry.js';
+import { createHost, createRegistry } from './registry.js';
+import type { RivuHost } from './registry.js';
+import type { RivuComponentMeta } from './render-hooks.js';
 import { viewerRegistryV1 } from './ui-kit/viewer.js';
 import { workflowRegistryV1 } from './ui-kit/workflow.js';
 
@@ -66,8 +67,8 @@ function summarizeProps(props: unknown): Record<string, unknown> | null {
   return out;
 }
 
-function defaultRegistry(): RivuComponentRegistry {
-  return createRegistry({ ...viewerRegistryV1, ...workflowRegistryV1 });
+function defaultHost(): RivuHost {
+  return createHost({ registry: createRegistry({ ...viewerRegistryV1, ...workflowRegistryV1 }) });
 }
 
 function resolveSnapshot(input: unknown): RivuExportSnapshotV1 {
@@ -87,6 +88,7 @@ function ExportUnknownComponentBlock(props: {
   componentType: string;
   schemaVersion: number;
   propsSummary: Record<string, unknown> | null;
+  message?: string;
 }) {
   return (
     <div
@@ -107,6 +109,9 @@ function ExportUnknownComponentBlock(props: {
         <span> • type: {props.componentType}</span>
         <span> • v: {props.schemaVersion}</span>
       </div>
+      {props.message ? (
+        <div style={{ marginTop: 6, color: 'var(--rivu-chart-4, #991b1b)' }}>{props.message}</div>
+      ) : null}
       {props.propsSummary ? (
         <pre style={{ marginTop: 8, whiteSpace: 'pre-wrap', overflowX: 'auto', color: 'var(--rivu-fg-muted, #374151)' }}>
           {JSON.stringify(props.propsSummary, null, 2)}
@@ -118,11 +123,11 @@ function ExportUnknownComponentBlock(props: {
 
 function renderComponentForExport(params: {
   kernelState: RivuKernelState;
-  registry: RivuComponentRegistry;
+  host: RivuHost;
   componentId: string;
   component: UiComponentV1;
 }): ReactNode {
-  const registration = params.registry[params.component.type];
+  const registration = params.host.registry[params.component.type];
   if (!registration) {
     return (
       <ExportUnknownComponentBlock
@@ -201,6 +206,30 @@ function renderComponentForExport(params: {
     );
   }
 
+  const meta: RivuComponentMeta = {
+    componentId: params.componentId,
+    componentType: params.component.type,
+    schemaVersion: params.component.schemaVersion,
+  };
+
+  let sanitizedProps = propsResult.data as any;
+  try {
+    if (params.host.renderHooks.sanitizeComponentProps) {
+      sanitizedProps = params.host.renderHooks.sanitizeComponentProps(meta, propsResult.data as any);
+    }
+  } catch (err) {
+    return (
+      <ExportUnknownComponentBlock
+        title="Component props blocked by host sanitizer"
+        componentId={params.componentId}
+        componentType={params.component.type}
+        schemaVersion={params.component.schemaVersion}
+        message={err instanceof Error ? err.message : String(err)}
+        propsSummary={summarizeProps(params.component.props)}
+      />
+    );
+  }
+
   const stateResult = registration.stateSchema ? registration.stateSchema.safeParse(params.component.state ?? {}) : null;
   if (stateResult && !stateResult.success) {
     return (
@@ -225,18 +254,19 @@ function renderComponentForExport(params: {
 
   return registration.render({
     kernel: kernel as any,
+    host: params.host,
     componentId: params.componentId,
     componentType: params.component.type,
     schemaVersion: params.component.schemaVersion,
     revision: params.component.revision,
-    props: propsResult.data,
+    props: sanitizedProps,
     state: stateResult ? stateResult.data : undefined,
   });
 }
 
 type ExportHtmlOptions = {
   snapshot: RivuExportSnapshotV1;
-  registry?: RivuComponentRegistry;
+  host?: RivuHost;
   title?: string;
 };
 
@@ -244,7 +274,7 @@ export function exportHtmlV1(snapshot: RivuExportSnapshotV1): string;
 export function exportHtmlV1(options: ExportHtmlOptions): string;
 export function exportHtmlV1(arg: RivuExportSnapshotV1 | ExportHtmlOptions): string {
   const snapshot = resolveSnapshot(isJsonObject(arg) && 'snapshot' in arg ? (arg as ExportHtmlOptions).snapshot : arg);
-  const registry = (isJsonObject(arg) && 'snapshot' in arg ? (arg as ExportHtmlOptions).registry : undefined) ?? defaultRegistry();
+  const host = (isJsonObject(arg) && 'snapshot' in arg ? (arg as ExportHtmlOptions).host : undefined) ?? defaultHost();
   const title = (isJsonObject(arg) && 'snapshot' in arg ? (arg as ExportHtmlOptions).title : undefined) ?? 'Rivu Viewer Export';
 
   const kernel = createKernel();
@@ -324,7 +354,7 @@ export function exportHtmlV1(arg: RivuExportSnapshotV1 | ExportHtmlOptions): str
                     <div className="slotTitle">inline</div>
                     <div className="mounts">
                       {inlineMounted.map(({ componentId, component }) => (
-                        <div key={componentId}>{renderComponentForExport({ kernelState, registry, componentId, component })}</div>
+                        <div key={componentId}>{renderComponentForExport({ kernelState, host, componentId, component })}</div>
                       ))}
                     </div>
                   </>
@@ -335,7 +365,7 @@ export function exportHtmlV1(arg: RivuExportSnapshotV1 | ExportHtmlOptions): str
                     <div className="slotTitle">sidebar</div>
                     <div className="mounts">
                       {sidebarMounted.map(({ componentId, component }) => (
-                        <div key={componentId}>{renderComponentForExport({ kernelState, registry, componentId, component })}</div>
+                        <div key={componentId}>{renderComponentForExport({ kernelState, host, componentId, component })}</div>
                       ))}
                     </div>
                   </>
@@ -351,9 +381,9 @@ export function exportHtmlV1(arg: RivuExportSnapshotV1 | ExportHtmlOptions): str
   return `<!doctype html>${renderToStaticMarkup(doc)}`;
 }
 
-export function exportChartSvgsV1(options: { snapshot: RivuExportSnapshotV1; registry?: RivuComponentRegistry }): Record<string, string> {
+export function exportChartSvgsV1(options: { snapshot: RivuExportSnapshotV1; host?: RivuHost }): Record<string, string> {
   const snapshot = resolveSnapshot(options.snapshot);
-  const registry = options.registry ?? defaultRegistry();
+  const host = options.host ?? defaultHost();
 
   const kernel = createKernel();
   const r = kernel.dispatch({ seq: 1, event: { type: 'STATE_SNAPSHOT', snapshot: snapshot.sharedState } });
@@ -371,7 +401,7 @@ export function exportChartSvgsV1(options: { snapshot: RivuExportSnapshotV1; reg
     const component = raw as UiComponentV1;
     if (!component || component.type !== 'Chart') continue;
 
-    const html = renderToStaticMarkup(<>{renderComponentForExport({ kernelState: state, registry, componentId, component })}</>);
+    const html = renderToStaticMarkup(<>{renderComponentForExport({ kernelState: state, host, componentId, component })}</>);
     const start = html.indexOf('<svg');
     if (start < 0) continue;
     const end = html.indexOf('</svg>', start);
@@ -381,4 +411,3 @@ export function exportChartSvgsV1(options: { snapshot: RivuExportSnapshotV1; reg
 
   return out;
 }
-

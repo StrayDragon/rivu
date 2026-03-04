@@ -1,7 +1,7 @@
 # a2ui-viz-chart Specification
 
 ## Purpose
-TBD - created by archiving change a2ui-viz-chart-v1. Update Purpose after archive.
+Define the stateless Viewer `Chart` component contract (schema v1): token-efficient columnar props shape, strict validation, and deterministic offline rendering suitable for replay and export.
 ## Requirements
 ### Requirement: Viewer 提供通用 Chart 组件（stateless）
 UI kit MUST 提供一个 Viewer（stateless）的图表组件：
@@ -130,4 +130,3 @@ Example:
 #### Scenario: 空数据展示占位态
 - **WHEN** `Chart` 挂载时没有可渲染的 rows
 - **THEN** UI 展示空态/占位态，而不是抛异常
-

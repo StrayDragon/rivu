@@ -8,6 +8,14 @@
   --rivu-fg-muted: #374151;
   --rivu-muted: #6b7280;
 
+  --rivu-font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  --rivu-font-size-sm: 12px;
+  --rivu-font-size-base: 14px;
+
+  --rivu-space-2: 8px;
+  --rivu-space-3: 12px;
+  --rivu-space-4: 14px;
+
   --rivu-border: #e5e7eb;
   --rivu-border-muted: #f3f4f6;
 

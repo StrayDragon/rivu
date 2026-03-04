@@ -2,9 +2,12 @@
 
 This document defines the **canonical** "first integration" baseline for Rivu.
 
+See also:
+- `docs/examples.md` — runnable, categorized React examples
+- `docs/integration.md` — component catalog + lifecycle + capabilities handshake
+
 Terminology note:
-- In the PRD this is sometimes described as `state.ui`.
-- In the implementation it is **always** stored under `sharedState.ui` (i.e. the `ui` key inside the shared state snapshot).
+- Rivu UI state is stored under `sharedState.ui` (i.e. the `ui` key inside the shared state snapshot).
 
 ## 1) Server: emit envelopes `{ seq, event }`
 
@@ -147,9 +150,24 @@ Minimal React rendering loop:
 
 ```tsx
 import { selectMountedUiComponentsV1, type RivuKernel } from 'rivu-kernel';
-import { ComponentRenderer, createRegistry, viewerRegistryV1, workflowRegistryV1 } from 'rivu-react';
+import { ComponentRenderer, createHost, createRegistry, viewerRegistryV1, workflowRegistryV1 } from 'rivu-react';
 
 const registry = createRegistry({ ...viewerRegistryV1, ...workflowRegistryV1 });
+const host = createHost({ registry });
+
+// Optional host config:
+// - renderHooks: formatting / URL sanitizer / markdown/highlight / props sanitizer (host-only, pre-render)
+// - slotProps: inject className/style/attrs into default sub-areas (without replacing slots)
+//
+// const host = createHost({
+//   registry,
+//   renderHooks: {
+//     sanitizeUrl: (rawUrl) => (rawUrl.startsWith('https:') ? rawUrl : null),
+//   },
+//   slotProps: {
+//     DataTable: { td: { className: 'tabular-nums' } },
+//   },
+// });
 
 function MessageInlineMounts(props: { kernel: RivuKernel; messageId: string }) {
   const state = props.kernel.getState();
@@ -157,7 +175,7 @@ function MessageInlineMounts(props: { kernel: RivuKernel; messageId: string }) {
   return (
     <div>
       {mounted.map((m) => (
-        <ComponentRenderer key={m.componentId} kernel={props.kernel} registry={registry} componentId={m.componentId} />
+        <ComponentRenderer key={m.componentId} kernel={props.kernel} host={host} componentId={m.componentId} />
       ))}
     </div>
   );

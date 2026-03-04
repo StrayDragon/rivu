@@ -9,6 +9,7 @@
   import { UI_V1_EVENT_NAME, type ChartPropsV1, type ChartSelectionStateV1, type ChartSelectionV1, type UiV1CustomEvent } from 'rivu-ui-spec';
 
   import { createClientRequestId } from '../client-request-id.js';
+  import type { RivuSvelteHost } from '../registry.js';
 
   const theme = {
     bg: 'var(--rivu-bg, #fff)',
@@ -102,6 +103,7 @@
     tooltipLines: string[];
   };
 
+  export let host: RivuSvelteHost;
   export let kernel: RivuKernel | undefined = undefined;
   export let componentId: string;
   export let revision: number;
@@ -110,7 +112,7 @@
   export let state: ChartSelectionStateV1 | undefined = undefined;
   export let interactive: boolean | undefined = undefined;
 
-  const containerPadding = 14;
+  let containerPadding = 14;
 
   function chartTitle(options: ChartPropsV1['options'] | undefined) {
     const title = options?.title?.trim();
@@ -122,8 +124,8 @@
     return typeof h === 'number' && Number.isFinite(h) && h > 0 ? h : 220;
   }
 
-  function formatNumber(value: number, unit?: string) {
-    const base = value.toLocaleString();
+  function formatNumber(value: number, path: string, unit?: string) {
+    const base = host.renderHooks.formatNumber(value, { componentId, componentType: 'Chart', path, ...(unit ? { unit } : {}) });
     return unit ? `${base} ${unit}` : base;
   }
 
@@ -136,6 +138,10 @@
   const updateWidth = () => {
     if (!node) return;
     width = node.clientWidth;
+    const paddingLeft = Number.parseFloat(getComputedStyle(node).paddingLeft);
+    if (Number.isFinite(paddingLeft) && paddingLeft > 0) {
+      containerPadding = paddingLeft;
+    }
   };
 
   let ro: ResizeObserver | null = null;
@@ -372,7 +378,7 @@
               const tooltipTitle = d.x;
               const tooltipLines = [
                 seriesDomain.length > 1 ? `series: ${series}` : '',
-                `${props.encoding.y ?? 'value'}: ${formatNumber(d.y, unit)}`,
+                `${props.encoding.y ?? 'value'}: ${formatNumber(d.y, `tooltip.bar.rows[${d.rowIndex}].y`, unit)}`,
               ].filter(Boolean);
 
               return {
@@ -431,7 +437,7 @@
                 const tooltipTitle = p.x;
                 const tooltipLines = [
                   bySeries.length > 1 ? `series: ${s}` : '',
-                  `${props.encoding.y ?? 'value'}: ${formatNumber(p.y, unit)}`,
+                  `${props.encoding.y ?? 'value'}: ${formatNumber(p.y, `tooltip.line.rows[${p.rowIndex}].y`, unit)}`,
                 ].filter(Boolean);
 
                 return {
@@ -509,7 +515,7 @@
             const opacity = isActive ? 1 : selection.kind === 'none' ? 1 : 0.35;
             const strokeWidth = isPointSelected ? 3 : 1;
             const tooltipTitle = values[i]!.label;
-            const tooltipLines = [`${props.encoding.value ?? 'value'}: ${formatNumber(values[i]!.value, unit)}`];
+            const tooltipLines = [`${props.encoding.value ?? 'value'}: ${formatNumber(values[i]!.value, `tooltip.pie.rows[${rowIndex}].value`, unit)}`];
 
             return {
               key: `${i}`,
@@ -550,7 +556,7 @@
 {:else}
   <div
     bind:this={node}
-    style={`position:relative;border:1px solid ${theme.border};border-radius:${theme.radius};padding:${containerPadding}px;background:${theme.bg};box-shadow:${theme.shadow};`}
+    style={`position:relative;border:1px solid ${theme.border};border-radius:${theme.radius};padding:var(--rivu-space-4, 14px);background:${theme.bg};box-shadow:${theme.shadow};`}
   >
     {#if mode === 'bar'}
       <svg
@@ -629,7 +635,7 @@
           {#each yTicks as t, i (i)}
             <g transform={`translate(0,${yScale ? yScale(t) : 0})`}>
               <line x1={0} x2={innerW} y1={0} y2={0} stroke={theme.borderMuted} />
-              <text x={-10} y={0} dy="0.32em" text-anchor="end" style={`fill:${theme.fgMuted};font-size:11px;`}>{formatNumber(t, unit)}</text>
+              <text x={-10} y={0} dy="0.32em" text-anchor="end" style={`fill:${theme.fgMuted};font-size:11px;`}>{formatNumber(t, `axis.y.ticks[${i}]`, unit)}</text>
             </g>
           {/each}
 
@@ -760,7 +766,7 @@
           {#each yTicks as t, i (i)}
             <g transform={`translate(0,${yScale ? yScale(t) : 0})`}>
               <line x1={0} x2={innerW} y1={0} y2={0} stroke={theme.borderMuted} />
-              <text x={-10} y={0} dy="0.32em" text-anchor="end" style={`fill:${theme.fgMuted};font-size:11px;`}>{formatNumber(t, unit)}</text>
+              <text x={-10} y={0} dy="0.32em" text-anchor="end" style={`fill:${theme.fgMuted};font-size:11px;`}>{formatNumber(t, `axis.y.ticks[${i}]`, unit)}</text>
             </g>
           {/each}
 

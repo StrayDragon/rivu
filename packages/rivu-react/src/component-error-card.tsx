@@ -26,10 +26,10 @@ export function ComponentErrorCard(props: ComponentErrorCardProps) {
       style={{
         border: '1px solid var(--rivu-border, #e5e7eb)',
         borderRadius: 'var(--rivu-radius, 14px)',
-        padding: 14,
+        padding: 'var(--rivu-space-4, 14px)',
         background: 'var(--rivu-bg, #fff)',
         boxShadow: 'var(--rivu-shadow, none)',
-        fontSize: 12,
+        fontSize: 'var(--rivu-font-size-sm, 12px)',
         color: 'var(--rivu-fg, #111827)',
         ...props.style,
       }}

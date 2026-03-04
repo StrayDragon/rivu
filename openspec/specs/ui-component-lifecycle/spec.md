@@ -1,7 +1,7 @@
 # ui-component-lifecycle Specification
 
 ## Purpose
-TBD - created by archiving change ui-component-lifecycle-v1. Update Purpose after archive.
+Define replayable UI component lifecycle fields (`status`, `error`) under `sharedState.ui.components[*]` to support streaming build→ready transitions, stable skeleton/error rendering, and safe fallbacks.
 ## Requirements
 ### Requirement: 组件条目支持 `status` 生命周期字段
 系统 MUST 支持在 `sharedState.ui.components[componentId]` 中携带可选生命周期字段 `status`，用于表达组件当前渲染阶段。
@@ -30,4 +30,3 @@ TBD - created by archiving change ui-component-lifecycle-v1. Update Purpose afte
 #### Scenario: Error status renders without crashing
 - **WHEN** 一个组件条目 `status="error"` 且包含合法的 `error`
 - **THEN** UI 使用 ErrorCard（或等价组件）展示错误信息，并保持页面可用
-

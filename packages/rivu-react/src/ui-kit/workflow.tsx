@@ -6,7 +6,9 @@ import type { RivuKernel } from 'rivu-kernel';
 import { UI_V1_EVENT_NAME, type UiV1CustomEvent } from 'rivu-ui-spec';
 
 import { createClientRequestId } from '../client-request-id.js';
-import type { RivuComponentRegistration, RivuComponentRegistry } from '../registry.js';
+import type { RivuComponentRegistration, RivuComponentRegistry, RivuHost } from '../registry.js';
+import { defaultRenderHooks } from '../render-hooks.js';
+import { applySlotProps } from '../slot-props.js';
 
 const theme = {
   bg: 'var(--rivu-bg, #fff)',
@@ -49,10 +51,10 @@ export type ApprovalCardStateV1 = z.output<typeof approvalCardStateV1Schema>;
 
 function buttonStyle(kind: 'primary' | 'danger' | 'default'): CSSProperties {
   const base: CSSProperties = {
-    padding: '8px 12px',
+    padding: 'var(--rivu-space-2, 8px) var(--rivu-space-3, 12px)',
     borderRadius: theme.radiusSm,
     border: '1px solid transparent',
-    fontSize: 12,
+    fontSize: 'var(--rivu-font-size-sm, 12px)',
     fontWeight: 600,
     cursor: 'pointer',
   };
@@ -86,6 +88,7 @@ export type ApprovalCardSlots = {
 
 export function ApprovalCard(
   props: ApprovalCardPropsV1 & {
+    host?: RivuHost;
     kernel: RivuKernel;
     componentId: string;
     revision: number;
@@ -95,6 +98,10 @@ export function ApprovalCard(
     slots?: ApprovalCardSlots;
   },
 ) {
+  const hooks = props.host?.renderHooks ?? defaultRenderHooks;
+  const slotProps = props.host?.slotProps?.ApprovalCard;
+  const meta = { componentId: props.componentId, componentType: APPROVAL_CARD_COMPONENT_TYPE };
+
   const status = props.state?.status ?? 'pending';
   const disabled = props.state?.disabled === true;
   const [localError, setLocalError] = useState<string | null>(null);
@@ -136,16 +143,22 @@ export function ApprovalCard(
       ...(typeof props.state?.decidedAtMs === 'number' ? { decidedAtMs: props.state.decidedAtMs } : {}),
     })
   ) : (
-    <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ fontSize: 12, color: 'var(--rivu-fg-muted, #374151)' }}>
+    <div
+      {...(() => {
+        const statusSlot = applySlotProps({ style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 } }, slotProps?.status);
+        const { className, style, ...attrs } = statusSlot;
+        return { className, style, ...attrs };
+      })()}
+    >
+      <div style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', color: 'var(--rivu-fg-muted, #374151)' }}>
         status:{' '}
         <span style={{ fontWeight: 650, color: status === 'approved' ? theme.chart2 : status === 'denied' ? theme.chart4 : 'var(--rivu-fg-muted, #374151)' }}>
           {status}
         </span>
       </div>
-      {props.state?.decidedBy ? <div style={{ fontSize: 12, color: theme.muted }}>by {props.state.decidedBy}</div> : null}
+      {props.state?.decidedBy ? <div style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.muted }}>by {props.state.decidedBy}</div> : null}
       {typeof props.state?.decidedAtMs === 'number' ? (
-        <div style={{ fontSize: 12, color: theme.muted }}>{new Date(props.state.decidedAtMs).toLocaleString()}</div>
+        <div style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.muted }}>{hooks.formatDateTime(props.state.decidedAtMs, { ...meta, path: 'state.decidedAtMs' })}</div>
       ) : null}
     </div>
   );
@@ -162,10 +175,23 @@ export function ApprovalCard(
             onDeny: () => void sendEvent('deny'),
           })
         : (
-            <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
+            <div
+              {...(() => {
+                const actionsSlot = applySlotProps({ style: { marginTop: 12, display: 'flex', gap: 10 } }, slotProps?.actions);
+                const { className, style, ...attrs } = actionsSlot;
+                return { className, style, ...attrs };
+              })()}
+            >
               <button
                 type="button"
-                style={{ ...buttonStyle('primary'), opacity: disabled || sending ? 0.7 : 1 }}
+                {...(() => {
+                  const approveSlot = applySlotProps(
+                    { style: { ...buttonStyle('primary'), opacity: disabled || sending ? 0.7 : 1 } },
+                    slotProps?.approveButton,
+                  );
+                  const { className, style, ...attrs } = approveSlot;
+                  return { className, style, ...attrs };
+                })()}
                 disabled={disabled || !!sending}
                 onClick={() => void sendEvent('approve')}
               >
@@ -173,7 +199,14 @@ export function ApprovalCard(
               </button>
               <button
                 type="button"
-                style={{ ...buttonStyle('danger'), opacity: disabled || sending ? 0.7 : 1 }}
+                {...(() => {
+                  const denySlot = applySlotProps(
+                    { style: { ...buttonStyle('danger'), opacity: disabled || sending ? 0.7 : 1 } },
+                    slotProps?.denyButton,
+                  );
+                  const { className, style, ...attrs } = denySlot;
+                  return { className, style, ...attrs };
+                })()}
                 disabled={disabled || !!sending}
                 onClick={() => void sendEvent('deny')}
               >
@@ -183,18 +216,43 @@ export function ApprovalCard(
           )
       : null;
 
+  const rootSlot = applySlotProps(
+    {
+      className: props.className,
+      style: {
+        border: `1px solid ${theme.border}`,
+        borderRadius: theme.radius,
+        padding: 'var(--rivu-space-4, 14px)',
+        background: theme.bg,
+        boxShadow: theme.shadow,
+        ...props.style,
+      },
+    },
+    slotProps?.root,
+  );
+  const { className: rootClassName, style: rootStyle, ...rootAttrs } = rootSlot;
+
   return (
     <div
-      className={props.className}
-      style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radius, padding: 14, background: theme.bg, boxShadow: theme.shadow, ...props.style }}
+      className={rootClassName}
+      style={rootStyle}
+      {...(rootAttrs as any)}
     >
-      <div style={{ fontWeight: 650, fontSize: 14, color: theme.fg }}>{props.title}</div>
-      {props.description ? <div style={{ marginTop: 6, fontSize: 12, color: theme.fgMuted }}>{props.description}</div> : null}
+      <div style={{ fontWeight: 650, fontSize: 'var(--rivu-font-size-base, 14px)', color: theme.fg }}>{props.title}</div>
+      {props.description ? (
+        <div style={{ marginTop: 6, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fgMuted }}>
+          {hooks.renderMarkdown(props.description, { ...meta, path: 'description' })}
+        </div>
+      ) : null}
 
       {statusNode}
 
-      {props.state?.message ? <div style={{ marginTop: 8, fontSize: 12, color: theme.fgMuted }}>{props.state.message}</div> : null}
-      {localError ? <div style={{ marginTop: 8, fontSize: 12, color: theme.chart4 }}>{localError}</div> : null}
+      {props.state?.message ? (
+        <div style={{ marginTop: 8, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fgMuted }}>
+          {hooks.renderMarkdown(props.state.message, { ...meta, path: 'state.message' })}
+        </div>
+      ) : null}
+      {localError ? <div style={{ marginTop: 8, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.chart4 }}>{localError}</div> : null}
 
       {actionsNode}
     </div>
@@ -205,8 +263,8 @@ export const approvalCardRegistrationV1: RivuComponentRegistration<ApprovalCardP
   schemaVersion: APPROVAL_CARD_SCHEMA_VERSION,
   propsSchema: approvalCardPropsV1Schema,
   stateSchema: approvalCardStateV1Schema,
-  render: ({ kernel, componentId, revision, props, state }) => (
-    <ApprovalCard kernel={kernel} componentId={componentId} revision={revision} state={state} {...props} />
+  render: ({ kernel, host, componentId, revision, props, state }) => (
+    <ApprovalCard host={host} kernel={kernel} componentId={componentId} revision={revision} state={state} {...props} />
   ),
 };
 
@@ -275,6 +333,7 @@ function domId(value: string) {
 
 export function FormCard(
   props: FormCardPropsV1 & {
+    host?: RivuHost;
     kernel: RivuKernel;
     componentId: string;
     revision: number;
@@ -284,6 +343,10 @@ export function FormCard(
     slots?: FormCardSlots;
   },
 ) {
+  const hooks = props.host?.renderHooks ?? defaultRenderHooks;
+  const slotProps = props.host?.slotProps?.FormCard;
+  const meta = { componentId: props.componentId, componentType: FORM_CARD_COMPONENT_TYPE };
+
   const disabled = props.state?.disabled === true || props.state?.status === 'submitting';
   const serverValues = props.state?.values ?? {};
 
@@ -337,23 +400,71 @@ export function FormCard(
     }
   };
 
+  const status = typeof props.state?.status === 'string' ? props.state.status : undefined;
   const statusNode = props.slots?.Status
-    ? props.slots.Status({
-        localError,
-        ...(typeof props.state?.status === 'string' ? { status: props.state.status } : {}),
-      })
-    : null;
+    ? props.slots.Status({ localError, ...(status ? { status } : {}) })
+    : status || localError
+      ? (
+          <div
+            {...(() => {
+              const statusSlot = applySlotProps({ style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 } }, slotProps?.status);
+              const { className, style, ...attrs } = statusSlot;
+              return { className, style, ...attrs };
+            })()}
+          >
+            {status ? (
+              <div style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', color: 'var(--rivu-fg-muted, #374151)' }}>
+                status:{' '}
+                <span style={{ fontWeight: 650, color: status === 'submitted' ? theme.chart2 : status === 'error' ? theme.chart4 : 'var(--rivu-fg-muted, #374151)' }}>
+                  {status}
+                </span>
+              </div>
+            ) : null}
+            {localError ? <div style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.chart4 }}>{localError}</div> : null}
+          </div>
+        )
+      : null;
   const submitLabel = props.submitLabel ?? (props.state?.status === 'submitting' ? 'Submitting…' : 'Submit');
+
+  const rootSlot = applySlotProps(
+    {
+      className: props.className,
+      style: {
+        border: `1px solid ${theme.border}`,
+        borderRadius: theme.radius,
+        padding: 'var(--rivu-space-4, 14px)',
+        background: theme.bg,
+        boxShadow: theme.shadow,
+        ...props.style,
+      },
+    },
+    slotProps?.root,
+  );
+  const { className: rootClassName, style: rootStyle, ...rootAttrs } = rootSlot;
 
   return (
     <div
-      className={props.className}
-      style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radius, padding: 14, background: theme.bg, boxShadow: theme.shadow, ...props.style }}
+      className={rootClassName}
+      style={rootStyle}
+      {...(rootAttrs as any)}
     >
-      <div style={{ fontWeight: 650, fontSize: 14, color: theme.fg }}>{props.title}</div>
-      {props.description ? <div style={{ marginTop: 6, fontSize: 12, color: theme.fgMuted }}>{props.description}</div> : null}
+      <div style={{ fontWeight: 650, fontSize: 'var(--rivu-font-size-base, 14px)', color: theme.fg }}>{props.title}</div>
+      {props.description ? (
+        <div style={{ marginTop: 6, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fgMuted }}>
+          {hooks.renderMarkdown(props.description, { ...meta, path: 'description' })}
+        </div>
+      ) : null}
 
-      <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div
+        {...(() => {
+          const fieldsSlot = applySlotProps(
+            { style: { marginTop: 'var(--rivu-space-3, 12px)', display: 'flex', flexDirection: 'column', gap: 12 } },
+            slotProps?.fields,
+          );
+          const { className, style, ...attrs } = fieldsSlot;
+          return { className, style, ...attrs };
+        })()}
+      >
         {props.fields.map((field) => {
           const value = values[field.id];
           const error = errors[field.id];
@@ -363,16 +474,26 @@ export function FormCard(
             width: '100%',
             borderRadius: theme.radiusSm,
             border: `1px solid ${theme.border}`,
-            padding: '8px 10px',
-            fontSize: 12,
+            padding: 'var(--rivu-space-2, 8px) 10px',
+            fontSize: 'var(--rivu-font-size-sm, 12px)',
             outline: 'none',
             background: theme.bg,
             color: theme.fg,
           };
 
           return (
-            <div key={field.id}>
-              <label htmlFor={inputId} style={{ fontSize: 12, fontWeight: 600, color: theme.fg, display: 'block' }}>
+            <div
+              key={field.id}
+              {...(() => {
+                const fieldSlot = applySlotProps({}, slotProps?.field);
+                const { className, style, ...attrs } = fieldSlot;
+                return { className, style, ...attrs };
+              })()}
+            >
+              <label
+                htmlFor={inputId}
+                style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', fontWeight: 600, color: theme.fg, display: 'block' }}
+              >
                 {labelText}
               </label>
               <div style={{ marginTop: 6 }}>
@@ -415,16 +536,21 @@ export function FormCard(
                   />
                 )}
               </div>
-              {error ? <div style={{ marginTop: 6, fontSize: 12, color: theme.chart4 }}>{error}</div> : null}
+              {error ? <div style={{ marginTop: 6, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.chart4 }}>{error}</div> : null}
             </div>
           );
         })}
       </div>
 
       {statusNode}
-      {!props.slots?.Status && localError ? <div style={{ marginTop: 10, fontSize: 12, color: theme.chart4 }}>{localError}</div> : null}
 
-      <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
+      <div
+        {...(() => {
+          const actionsSlot = applySlotProps({ style: { marginTop: 'var(--rivu-space-4, 14px)', display: 'flex', gap: 10 } }, slotProps?.actions);
+          const { className, style, ...attrs } = actionsSlot;
+          return { className, style, ...attrs };
+        })()}
+      >
         {props.slots?.Actions ? (
           props.slots.Actions({
             disabled,
@@ -435,7 +561,11 @@ export function FormCard(
         ) : (
           <button
             type="button"
-            style={{ ...buttonStyle('primary'), opacity: disabled ? 0.7 : 1 }}
+            {...(() => {
+              const submitSlot = applySlotProps({ style: { ...buttonStyle('primary'), opacity: disabled ? 0.7 : 1 } }, slotProps?.submitButton);
+              const { className, style, ...attrs } = submitSlot;
+              return { className, style, ...attrs };
+            })()}
             disabled={disabled}
             onClick={() => void onSubmit()}
           >
@@ -451,8 +581,8 @@ export const formCardRegistrationV1: RivuComponentRegistration<FormCardPropsV1, 
   schemaVersion: FORM_CARD_SCHEMA_VERSION,
   propsSchema: formCardPropsV1Schema,
   stateSchema: formCardStateV1Schema,
-  render: ({ kernel, componentId, revision, props, state }) => (
-    <FormCard kernel={kernel} componentId={componentId} revision={revision} state={state} {...props} />
+  render: ({ kernel, host, componentId, revision, props, state }) => (
+    <FormCard host={host} kernel={kernel} componentId={componentId} revision={revision} state={state} {...props} />
   ),
 };
 

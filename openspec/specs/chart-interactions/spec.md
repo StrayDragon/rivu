@@ -1,7 +1,7 @@
 # chart-interactions Specification
 
 ## Purpose
-TBD - created by archiving change chart-interactions-v1. Update Purpose after archive.
+Define the minimal interactive workflow contract for `Chart` via `ui.v1.event` (selection/clear), including token-efficient payloads and server-authoritative, replayable selection state.
 ## Requirements
 ### Requirement: Chart 支持最小交互事件集合（v1）
 当 `component.type = "Chart"` 且作为 workflow 组件使用时（包含 server-authoritative `state` 与 `revision`），系统 MUST 支持以下最小交互事件（通过 `CUSTOM(name="ui.v1.event")` 回传）：
@@ -52,4 +52,3 @@ TBD - created by archiving change chart-interactions-v1. Update Purpose after ar
 #### Scenario: Clear selection resets highlight
 - **WHEN** 用户触发清空选择
 - **THEN** UI 在回放到最新 state 后不再高亮任何选择
-

@@ -1,5 +1,5 @@
 import { exportHtmlV1, type RivuExportSnapshotV1 } from './viewer-export.js';
-import type { RivuComponentRegistry } from './registry.js';
+import type { RivuHost } from './registry.js';
 
 type PlaywrightLike = {
   chromium: {
@@ -29,7 +29,7 @@ async function loadPlaywright(): Promise<PlaywrightLike> {
 
 export type ExportPdfV1Options = {
   snapshot: RivuExportSnapshotV1;
-  registry?: RivuComponentRegistry;
+  host?: RivuHost;
   title?: string;
   playwright?: PlaywrightLike;
   launchOptions?: unknown;
@@ -39,7 +39,7 @@ export type ExportPdfV1Options = {
 export async function exportPdfV1(options: ExportPdfV1Options): Promise<Uint8Array> {
   const html = exportHtmlV1({
     snapshot: options.snapshot,
-    ...(options.registry ? { registry: options.registry } : {}),
+    ...(options.host ? { host: options.host } : {}),
     ...(options.title ? { title: options.title } : {}),
   });
   const playwright = options.playwright ?? (await loadPlaywright());

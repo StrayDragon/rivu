@@ -16,9 +16,10 @@ import {
   type UiV1CustomEvent,
 } from 'rivu-ui-spec';
 
-import type { RivuComponentRegistration } from '../registry.js';
+import type { RivuComponentRegistration, RivuHost } from '../registry.js';
 import { ComponentErrorCard } from '../component-error-card.js';
 import { createClientRequestId } from '../client-request-id.js';
+import { defaultRenderHooks } from '../render-hooks.js';
 
 const theme = {
   bg: 'var(--rivu-bg, #fff)',
@@ -85,11 +86,6 @@ function chartHeight(options: ChartPropsV1['options'] | undefined) {
   return typeof h === 'number' && Number.isFinite(h) && h > 0 ? h : 220;
 }
 
-function formatNumber(value: number, unit?: string) {
-  const base = value.toLocaleString();
-  return unit ? `${base} ${unit}` : base;
-}
-
 function ChartEmptyState(props: { title?: string | undefined; className?: string | undefined; style?: CSSProperties | undefined }) {
   return (
     <div
@@ -97,11 +93,11 @@ function ChartEmptyState(props: { title?: string | undefined; className?: string
       style={{
         border: `1px solid ${theme.borderMuted}`,
         borderRadius: theme.radius,
-        padding: 14,
+        padding: 'var(--rivu-space-4, 14px)',
         background: theme.bgMuted,
         boxShadow: theme.shadow,
         color: theme.muted,
-        fontSize: 12,
+        fontSize: 'var(--rivu-font-size-sm, 12px)',
         ...props.style,
       }}
     >
@@ -122,7 +118,7 @@ function Legend(props: { entries: Array<{ label: string; color: string }>; class
         gap: 10,
         marginTop: 10,
         color: theme.fgMuted,
-        fontSize: 12,
+        fontSize: 'var(--rivu-font-size-sm, 12px)',
         ...props.style,
       }}
     >
@@ -147,13 +143,13 @@ function Tooltip(props: { state: TooltipState }) {
         transform: 'translate(10px, 10px)',
         pointerEvents: 'none',
         maxWidth: 260,
-        padding: '8px 10px',
+        padding: 'var(--rivu-space-2, 8px) 10px',
         borderRadius: theme.radiusSm,
         border: `1px solid ${theme.borderMuted}`,
         background: theme.bg,
         boxShadow: theme.shadow,
         color: theme.fg,
-        fontSize: 12,
+        fontSize: 'var(--rivu-font-size-sm, 12px)',
         lineHeight: 1.35,
         zIndex: 10,
       }}
@@ -171,6 +167,7 @@ function Tooltip(props: { state: TooltipState }) {
 
 function ChartInner(
   props: ChartPropsV1 & {
+    host?: RivuHost;
     kernel?: RivuKernel;
     componentId?: string;
     revision?: number;
@@ -183,6 +180,13 @@ function ChartInner(
   const title = chartTitle(props.options);
   const height = chartHeight(props.options);
   const unit = props.options?.unit;
+  const hooks = props.host?.renderHooks ?? defaultRenderHooks;
+  const meta = { componentId: props.componentId ?? 'unknown', componentType: CHART_COMPONENT_TYPE };
+
+  const formatNumberWithUnit = (value: number, path: string) => {
+    const base = hooks.formatNumber(value, { ...meta, path, ...(unit ? { unit } : {}) });
+    return unit ? `${base} ${unit}` : base;
+  };
 
   const interactive = props.interactive === true;
   const selection: ChartSelectionV1 = props.state?.selection ?? { kind: 'none' };
@@ -302,7 +306,7 @@ function ChartInner(
     position: 'relative',
     border: `1px solid ${theme.border}`,
     borderRadius: theme.radius,
-    padding: 14,
+    padding: 'var(--rivu-space-4, 14px)',
     background: theme.bg,
     boxShadow: theme.shadow,
     ...props.style,
@@ -449,7 +453,7 @@ function ChartInner(
                   <g key={i} transform={`translate(0,${yScale(t)})`}>
                     <line x1={0} x2={innerW} y1={0} y2={0} stroke={theme.borderMuted} />
                     <text x={-10} y={0} dy="0.32em" textAnchor="end" style={{ fill: theme.fgMuted, fontSize: 11 }}>
-                      {formatNumber(t, unit)}
+                      {formatNumberWithUnit(t, `axis.y.ticks[${i}]`)}
                     </text>
                   </g>
                 ))}
@@ -512,7 +516,7 @@ function ChartInner(
                           title: d.x,
                           lines: [
                             seriesDomain.length > 1 ? `series: ${series}` : '',
-                            `${props.encoding.y ?? 'value'}: ${formatNumber(d.y, unit)}`,
+                            `${props.encoding.y ?? 'value'}: ${formatNumberWithUnit(d.y, `data[${i}].y`)}`,
                           ].filter(Boolean),
                         });
                       }}
@@ -526,7 +530,7 @@ function ChartInner(
                           title: d.x,
                           lines: [
                             seriesDomain.length > 1 ? `series: ${series}` : '',
-                            `${props.encoding.y ?? 'value'}: ${formatNumber(d.y, unit)}`,
+                            `${props.encoding.y ?? 'value'}: ${formatNumberWithUnit(d.y, `data[${i}].y`)}`,
                           ].filter(Boolean),
                         });
                       }}
@@ -634,7 +638,7 @@ function ChartInner(
                 <g key={i} transform={`translate(0,${yScale(t)})`}>
                   <line x1={0} x2={innerW} y1={0} y2={0} stroke={theme.borderMuted} />
                   <text x={-10} y={0} dy="0.32em" textAnchor="end" style={{ fill: theme.fgMuted, fontSize: 11 }}>
-                    {formatNumber(t, unit)}
+                    {formatNumberWithUnit(t, `axis.y.ticks[${i}]`)}
                   </text>
                 </g>
               ))}
@@ -690,7 +694,7 @@ function ChartInner(
                             title: p.x,
                             lines: [
                               bySeries.length > 1 ? `series: ${g.series}` : '',
-                              `${props.encoding.y ?? 'value'}: ${formatNumber(p.y, unit)}`,
+                              `${props.encoding.y ?? 'value'}: ${formatNumberWithUnit(p.y, `data[${p.rowIndex}].y`)}`,
                             ].filter(Boolean),
                           });
                         }}
@@ -704,7 +708,7 @@ function ChartInner(
                             title: p.x,
                             lines: [
                               bySeries.length > 1 ? `series: ${g.series}` : '',
-                              `${props.encoding.y ?? 'value'}: ${formatNumber(p.y, unit)}`,
+                              `${props.encoding.y ?? 'value'}: ${formatNumberWithUnit(p.y, `data[${p.rowIndex}].y`)}`,
                             ].filter(Boolean),
                           });
                         }}
@@ -794,7 +798,7 @@ function ChartInner(
                       x: p0.x,
                       y: p0.y,
                       title: values[i]!.label,
-                      lines: [`${props.encoding.value ?? 'value'}: ${formatNumber(values[i]!.value, unit)}`],
+                      lines: [`${props.encoding.value ?? 'value'}: ${formatNumberWithUnit(values[i]!.value, `data[${rowIndex}].value`)}`],
                     });
                   }}
                   onBlur={() => setTooltip({ visible: false })}
@@ -805,7 +809,7 @@ function ChartInner(
                       x: p0.x,
                       y: p0.y,
                       title: values[i]!.label,
-                      lines: [`${props.encoding.value ?? 'value'}: ${formatNumber(values[i]!.value, unit)}`],
+                      lines: [`${props.encoding.value ?? 'value'}: ${formatNumberWithUnit(values[i]!.value, `data[${rowIndex}].value`)}`],
                     });
                   }}
                 />
@@ -848,7 +852,7 @@ function ChartInner(
             border: `1px solid ${theme.borderMuted}`,
             background: theme.bg,
             color: theme.fgMuted,
-            fontSize: 12,
+            fontSize: 'var(--rivu-font-size-sm, 12px)',
             maxWidth: '80%',
             userSelect: 'none',
           }}
@@ -873,7 +877,7 @@ function ChartInner(
         </div>
       ) : null}
       {localError ? (
-        <div style={{ position: 'absolute', left: 10, bottom: 10, color: 'var(--rivu-chart-4, #991b1b)', fontSize: 12 }}>
+        <div style={{ position: 'absolute', left: 10, bottom: 10, color: 'var(--rivu-chart-4, #991b1b)', fontSize: 'var(--rivu-font-size-sm, 12px)' }}>
           {localError}
         </div>
       ) : null}
@@ -903,6 +907,7 @@ class ChartErrorBoundary extends Component<{ children: ReactNode }, { error: Err
 
 export function Chart(
   props: ChartPropsV1 & {
+    host?: RivuHost;
     kernel?: RivuKernel;
     componentId?: string;
     revision?: number;
@@ -923,9 +928,9 @@ export const chartRegistrationV1: RivuComponentRegistration<ChartPropsV1, ChartS
   schemaVersion: CHART_SCHEMA_VERSION,
   propsSchema: chartPropsV1Schema,
   stateSchema: chartSelectionStateV1Schema,
-  render: ({ kernel, componentId, revision, props, state }) => {
+  render: ({ kernel, host, componentId, revision, props, state }) => {
     const raw = selectUiComponentV1(kernel.getState(), componentId);
     const interactive = raw?.state != null;
-    return <Chart {...props} kernel={kernel} componentId={componentId} revision={revision} state={state} interactive={interactive} />;
+    return <Chart host={host} {...props} kernel={kernel} componentId={componentId} revision={revision} state={state} interactive={interactive} />;
   },
 };

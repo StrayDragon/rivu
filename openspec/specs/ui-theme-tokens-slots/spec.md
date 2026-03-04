@@ -1,7 +1,7 @@
 # ui-theme-tokens-slots Specification
 
 ## Purpose
-TBD - created by archiving change ui-theme-tokens-slots. Update Purpose after archive.
+Define the theming + customization surface for the UI kit: CSS variable theme tokens (with fallbacks), `className`/`style` overrides, and slots/overrides for replacing key sub-areas without forking components.
 ## Requirements
 ### Requirement: UI kit 通过 CSS variables（带 fallback）实现主题化
 UI kit MUST 支持通过 CSS variables（theme tokens）进行主题化。
@@ -34,4 +34,27 @@ slots API MUST 是可选的，并且在省略时 MUST 提供合理的默认行�
 #### Scenario: 宿主替换 empty state slot
 - **WHEN** 宿主通过 slots API 替换复杂组件的 empty-state slot
 - **THEN** 组件使用自定义 empty-state renderer 而非默认实现
+
+### Requirement: Theme tokens include typography and spacing primitives
+
+The UI kit token set MUST include minimal typography and spacing primitives so hosts can align Rivu components with their design system without forking.
+
+At minimum, the token set MUST include:
+- a base font-family token
+- at least two font-size tokens (e.g. `sm` and `base`)
+- at least three spacing tokens usable for padding/gaps
+
+#### Scenario: Host maps design-system typography tokens
+- **WHEN** a host maps its own typography/spacing tokens into `--rivu-*`
+- **THEN** Rivu components pick up the host typography/spacing without code changes
+
+### Requirement: Complex components support `slotProps` injection
+
+Complex components that already support `slots` MUST also support a `slotProps` mechanism (or framework-equivalent) to inject props/styling into default sub-areas without replacing the entire slot renderer.
+
+At minimum, `DataTable` and workflow cards MUST expose `slotProps` for their key sub-areas (table/cells/actions/buttons/fields).
+
+#### Scenario: Host injects className into default actions area
+- **WHEN** a host provides `slotProps` for a workflow card actions area
+- **THEN** the default actions renderer applies the injected props while preserving server-authoritative behavior
 

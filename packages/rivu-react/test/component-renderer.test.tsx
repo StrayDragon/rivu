@@ -5,7 +5,7 @@ import { expect, test } from 'vitest';
 
 import { createKernel } from 'rivu-kernel';
 
-import { ComponentRenderer, createRegistry, useKernelState } from '../src/index.js';
+import { ComponentRenderer, createHost, createRegistry, useKernelState } from '../src/index.js';
 
 test('ComponentRenderer renders registered component and updates on STATE_DELTA', () => {
   const kernel = createKernel();
@@ -43,7 +43,7 @@ test('ComponentRenderer renders registered component and updates on STATE_DELTA'
     },
   });
 
-  render(<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_metric" />);
+  render(<ComponentRenderer kernel={kernel} host={createHost({ registry })} componentId="cmp_metric" />);
   expect(screen.getByTestId('metric').textContent).toBe('Revenue:1');
 
   act(() => {
@@ -82,7 +82,7 @@ test('ComponentRenderer degrades on unknown component type', () => {
     },
   });
 
-  render(<ComponentRenderer kernel={kernel} registry={createRegistry({})} componentId="cmp_unknown" />);
+  render(<ComponentRenderer kernel={kernel} host={createHost({ registry: createRegistry({}) })} componentId="cmp_unknown" />);
   expect(screen.getByText('Unknown component type')).toBeTruthy();
 });
 
@@ -117,7 +117,7 @@ test('ComponentRenderer degrades on invalid props', () => {
     },
   });
 
-  render(<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_bad" />);
+  render(<ComponentRenderer kernel={kernel} host={createHost({ registry })} componentId="cmp_bad" />);
   expect(screen.getByText('Invalid component props')).toBeTruthy();
 });
 
@@ -154,7 +154,7 @@ test('ComponentRenderer degrades on invalid state', () => {
     },
   });
 
-  render(<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_bad_state" />);
+  render(<ComponentRenderer kernel={kernel} host={createHost({ registry })} componentId="cmp_bad_state" />);
   expect(screen.getByText('Invalid component state')).toBeTruthy();
 });
 
@@ -190,7 +190,7 @@ test('ComponentRenderer renders skeleton for status=building (without strict pro
     },
   });
 
-  render(<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_building" />);
+  render(<ComponentRenderer kernel={kernel} host={createHost({ registry })} componentId="cmp_building" />);
   expect(screen.getByTestId('rivu-component-skeleton')).toBeTruthy();
 });
 
@@ -227,9 +227,101 @@ test('ComponentRenderer renders error card for status=error (without strict prop
     },
   });
 
-  render(<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_error" />);
+  render(<ComponentRenderer kernel={kernel} host={createHost({ registry })} componentId="cmp_error" />);
   expect(screen.getByTestId('rivu-component-error-card')).toBeTruthy();
   expect(screen.getByText('BOOM: failed')).toBeTruthy();
+});
+
+test('ComponentRenderer applies host sanitizeComponentProps', () => {
+  const kernel = createKernel();
+
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_metric: {
+              type: 'MetricCard',
+              schemaVersion: 1,
+              props: { label: 'Revenue', value: 1 },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const registry = createRegistry({
+    MetricCard: {
+      schemaVersion: 1,
+      propsSchema: z.object({ label: z.string(), value: z.number() }).strict(),
+      render: ({ props }) => (
+        <div data-testid="metric_sanitized">
+          {props.label}:{props.value}
+        </div>
+      ),
+    },
+  });
+
+  const host = createHost({
+    registry,
+    renderHooks: {
+      sanitizeComponentProps: (_meta, props) => ({ ...props, value: 42 }),
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} host={host} componentId="cmp_metric" />);
+  expect(screen.getByTestId('metric_sanitized').textContent).toBe('Revenue:42');
+});
+
+test('ComponentRenderer degrades when host sanitizer blocks props', () => {
+  const kernel = createKernel();
+
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_metric: {
+              type: 'MetricCard',
+              schemaVersion: 1,
+              props: { label: 'Revenue', value: 1 },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const registry = createRegistry({
+    MetricCard: {
+      schemaVersion: 1,
+      propsSchema: z.object({ label: z.string(), value: z.number() }).strict(),
+      render: () => <div data-testid="metric" />,
+    },
+  });
+
+  const host = createHost({
+    registry,
+    renderHooks: {
+      sanitizeComponentProps: () => {
+        throw new Error('blocked');
+      },
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} host={host} componentId="cmp_metric" />);
+  expect(screen.getByText('Component props blocked by host sanitizer')).toBeTruthy();
 });
 
 test('useKernelState subscribes and re-renders', () => {

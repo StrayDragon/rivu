@@ -1,7 +1,7 @@
 # react-examples Specification
 
 ## Purpose
-TBD - created by archiving change rivu-react-examples. Update Purpose after archive.
+Define requirements for the official React example(s): runnable without external services, Provider-free by default, and covering key v1 flows (mounts, datasets, lifecycle, exports, compaction, capabilities) end-to-end.
 ## Requirements
 ### Requirement: React demo project exists
 The repository MUST include a runnable React demo under `examples/` that depends on `rivu-kernel` and `rivu-react` via workspace dependencies.
@@ -24,7 +24,7 @@ demo MUST 从官方 registry 中渲染所有 v1 MVP 组件类型。
 - **THEN** 会渲染 `ApprovalCard` 与 `FormCard`
 
 ### Requirement: Demo demonstrates mounts embedding
-The demo MUST demonstrate `state.ui.components[componentId].mounts` embedding using PRD slots `inline | sidebar`.
+The demo MUST demonstrate `sharedState.ui.components[componentId].mounts` embedding using the standard mount slots `inline | sidebar`.
 
 #### Scenario: Inline mounts render under messages
 - **WHEN** a component is mounted with `{ slot: "inline" }` for a message
@@ -124,4 +124,3 @@ React demo MUST 包含一个 chart 交互示例：
 #### Scenario: Click updates selection highlight
 - **WHEN** 用户点击某个 datum 并完成一次 round-trip
 - **THEN** 图表高亮该 datum（或展示 selection 标签），并在刷新/重连后仍可从快照回放出相同高亮状态
-

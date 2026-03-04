@@ -1,10 +1,12 @@
 import { selectUiComponentV1, selectUiDatasetV1, type RivuKernelState } from 'rivu-kernel';
 
-import type { RivuSvelteComponentRegistry } from './registry.js';
+import type { RivuSvelteComponentRegistry, RivuSvelteHost } from './registry.js';
+import type { RivuComponentMeta } from './render-hooks.js';
 
 export type ResolveUiComponentResult =
   | {
       status: 'ok';
+      host: RivuSvelteHost;
       componentId: string;
       componentType: string;
       schemaVersion: number;
@@ -16,6 +18,7 @@ export type ResolveUiComponentResult =
     }
   | {
       status: 'building';
+      host: RivuSvelteHost;
       componentId: string;
       componentType: string;
       schemaVersion: number;
@@ -24,6 +27,7 @@ export type ResolveUiComponentResult =
     }
   | {
       status: 'error';
+      host: RivuSvelteHost;
       componentId: string;
       componentType: string;
       schemaVersion: number;
@@ -35,13 +39,13 @@ export type ResolveUiComponentResult =
 
 export function resolveUiComponentV1(params: {
   state: RivuKernelState;
-  registry: RivuSvelteComponentRegistry;
+  host: RivuSvelteHost;
   componentId: string;
 }): ResolveUiComponentResult {
   const component = selectUiComponentV1(params.state, params.componentId);
   if (!component) return { status: 'not_found', details: { componentId: params.componentId } };
 
-  const registration = params.registry[component.type];
+  const registration = params.host.registry[component.type];
   if (!registration) {
     return {
       status: 'unknown_type',
@@ -65,6 +69,7 @@ export function resolveUiComponentV1(params: {
   if (lifecycleStatus === 'error') {
     return {
       status: 'error',
+      host: params.host,
       componentId: params.componentId,
       componentType: component.type,
       schemaVersion: component.schemaVersion,
@@ -76,6 +81,7 @@ export function resolveUiComponentV1(params: {
   if (lifecycleStatus === 'building') {
     return {
       status: 'building',
+      host: params.host,
       componentId: params.componentId,
       componentType: component.type,
       schemaVersion: component.schemaVersion,
@@ -183,15 +189,39 @@ export function resolveUiComponentV1(params: {
     };
   }
 
+  const meta: RivuComponentMeta = {
+    componentId: params.componentId,
+    componentType: component.type,
+    schemaVersion: component.schemaVersion,
+  };
+
+  let sanitizedProps = dataRefResolution.props;
+  try {
+    if (params.host.renderHooks.sanitizeComponentProps) {
+      sanitizedProps = params.host.renderHooks.sanitizeComponentProps(meta, dataRefResolution.props as any);
+    }
+  } catch (err) {
+    return {
+      status: 'invalid_props',
+      details: {
+        componentId: params.componentId,
+        componentType: component.type,
+        reason: 'blocked_by_sanitizer',
+        error: err instanceof Error ? err.message : String(err),
+      },
+    };
+  }
+
   return {
     status: 'ok',
+    host: params.host,
     componentId: params.componentId,
     componentType: component.type,
     schemaVersion: component.schemaVersion,
     revision: component.revision,
     hasState: component.state != null,
     Component: registration.Component,
-    props: dataRefResolution.props,
+    props: sanitizedProps,
     state: stateResult ? stateResult.data : undefined,
   };
 }

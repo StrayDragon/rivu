@@ -31,11 +31,13 @@ See also:
 In TS/Node (or in-browser demo), generate a standalone HTML string:
 
 ```ts
-import { exportHtmlV1 } from 'rivu-react';
+import { createHost, exportHtmlV1 } from 'rivu-react';
+
+const host = createHost({ registry }); // your registry (viewer/workflow/custom)
 
 const html = exportHtmlV1({
   snapshot,
-  registry, // your registry (viewer/workflow/custom)
+  host,
 });
 ```
 
@@ -51,7 +53,7 @@ If the snapshot contains `Chart` components, you can export SVG assets:
 ```ts
 import { exportChartSvgsV1 } from 'rivu-react';
 
-const svgs = exportChartSvgsV1({ snapshot, registry });
+const svgs = exportChartSvgsV1({ snapshot, host });
 // { [componentId]: "<svg ...>...</svg>" }
 ```
 
@@ -69,7 +71,7 @@ Example using Playwright:
 import { chromium } from 'playwright';
 import { exportHtmlV1 } from 'rivu-react';
 
-const html = exportHtmlV1({ snapshot, registry });
+const html = exportHtmlV1({ snapshot, host });
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
@@ -93,7 +95,7 @@ import { exportPdfV1 } from 'rivu-react';
 
 const pdfBytes = await exportPdfV1({
   snapshot,
-  registry,
+  host,
   pdfOptions: { format: 'A4' },
 });
 ```

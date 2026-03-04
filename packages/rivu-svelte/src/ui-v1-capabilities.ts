@@ -1,6 +1,6 @@
 import { chartMarkV1Schema, type UiV1CapabilitiesFeaturesV1, type UiV1CapabilitiesValueV1 } from 'rivu-ui-spec';
 
-import type { RivuSvelteComponentRegistry } from './registry.js';
+import type { RivuSvelteHost } from './registry.js';
 
 type FeaturesOverride = Partial<UiV1CapabilitiesFeaturesV1> & Record<string, unknown>;
 
@@ -29,9 +29,9 @@ function mergeFeatures(base: UiV1CapabilitiesFeaturesV1, override?: FeaturesOver
   return merged as UiV1CapabilitiesFeaturesV1;
 }
 
-export function buildUiV1Capabilities(registry: RivuSvelteComponentRegistry, features?: FeaturesOverride): UiV1CapabilitiesValueV1 {
+export function buildUiV1Capabilities(host: RivuSvelteHost, features?: FeaturesOverride): UiV1CapabilitiesValueV1 {
   const components: UiV1CapabilitiesValueV1['components'] = {};
-  for (const [componentType, registration] of Object.entries(registry)) {
+  for (const [componentType, registration] of Object.entries(host.registry)) {
     components[componentType] = {
       minSchemaVersion: registration.schemaVersion,
       maxSchemaVersion: registration.schemaVersion,
@@ -43,7 +43,7 @@ export function buildUiV1Capabilities(registry: RivuSvelteComponentRegistry, fea
     lifecycle: true,
   };
 
-  if (Object.prototype.hasOwnProperty.call(registry, 'Chart')) {
+  if (Object.prototype.hasOwnProperty.call(host.registry, 'Chart')) {
     baseFeatures.chart = {
       marks: chartMarkV1Schema.options,
       interactions: [],
@@ -58,4 +58,3 @@ export function buildUiV1Capabilities(registry: RivuSvelteComponentRegistry, fea
     features: merged,
   };
 }
-

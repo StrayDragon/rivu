@@ -1,7 +1,7 @@
 # integration-ergonomics Specification
 
 ## Purpose
-TBD - created by archiving change integration-ergonomics-v1. Update Purpose after archive.
+Define the canonical integration baseline (docs + examples): SSE/WS envelopes `{seq,event}`, `resumeFrom` semantics, a consistent default streaming event variant, and required debugging/patch-helper ergonomics.
 ## Requirements
 ### Requirement: A canonical integration quickstart exists
 仓库 MUST 提供一份唯一且权威的集成 Quickstart 文档，用于定义将 Rivu 集成到既有应用中的推荐基线做法。
@@ -41,4 +41,3 @@ docs MAY 提及 `TEXT_MESSAGE_CONTENT` / `TOOL_CALL_ARGS` 作为兼容替代方�
 #### Scenario: Inspector reveals a sequence gap
 - **WHEN** kernel 因 `seq` gap 进入需要 resync 的状态
 - **THEN** inspector 能显示 kernel state 中的 `expectedSeq` 与 `gotSeq`
-

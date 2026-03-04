@@ -1,28 +1,226 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import * as fastJsonPatch from 'fast-json-patch';
-import { createKernel, selectMountedUiComponentsV1, type RivuKernel } from 'rivu-kernel';
+import {
+  createKernel,
+  selectMountedUiComponentsV1,
+  selectUiComponentV1,
+  selectUiDatasetV1,
+  selectUiStateV1,
+  type RivuKernel,
+} from 'rivu-kernel';
 import {
   ComponentRenderer,
   DATA_TABLE_COMPONENT_TYPE,
   DataTable,
   ProtocolInspector,
+  UnknownComponentCard,
   buildUiV1Capabilities,
+  createClientRequestId,
+  createHost,
   createRegistry,
   dataTableRegistrationV1,
+  defaultRenderHooks,
   exportChartSvgsV1,
   exportHtmlV1,
+  type RivuExportSnapshotV1,
   useKernelState,
   viewerRegistryV1,
   workflowRegistryV1,
 } from 'rivu-react';
+import { UI_V1_EVENT_NAME, type UiV1CustomEvent } from 'rivu-ui-spec';
 
 import { DEMO_MESSAGE_IDS, createBootstrapEnvelopes, createInitialSharedState } from './demo-fixtures.js';
-import { createMockServer } from './mock-server.js';
+import { createMockServer, type MockServer } from './mock-server.js';
+
+type SectionId =
+  | 'overview'
+  | 'viewer'
+  | 'workflow'
+  | 'datasets'
+  | 'charts'
+  | 'lifecycle'
+  | 'export'
+  | 'compaction'
+  | 'chat'
+  | 'docs';
+
+const SECTIONS: Array<{ id: SectionId; label: string; description: string }> = [
+  { id: 'overview', label: 'Overview', description: 'How the demo works (kernel + registry + mounts + mock server).' },
+  { id: 'viewer', label: 'Viewer', description: 'Stateless, replayable components (safe for offline export/review).' },
+  { id: 'workflow', label: 'Workflow', description: 'Stateful components with ui.v1.event round-trip (server authoritative).' },
+  { id: 'datasets', label: 'Datasets', description: 'dataRef + dataset updates via STATE_DELTA patches.' },
+  { id: 'charts', label: 'Charts', description: 'Chart rendering + v1 interactions (point/range selection).' },
+  { id: 'lifecycle', label: 'Lifecycle', description: 'building → ready streaming, plus error + unknown fallbacks.' },
+  { id: 'export', label: 'Export', description: 'Export snapshot → HTML + SVG assets (deterministic/offline).' },
+  { id: 'compaction', label: 'Compaction', description: 'Server-side event compaction simulation (chunks + snapshot tuning).' },
+  { id: 'chat', label: 'Chat Layout', description: 'Mounts into messages: inline vs sidebar slots.' },
+  { id: 'docs', label: 'Docs', description: 'Where the matching guides live in this repo.' },
+];
+
+const EXAMPLES = {
+  viewer: [
+    {
+      componentId: 'cmp_report_section',
+      title: 'ReportSection',
+      description: 'A simple container card (stateless, viewer-safe).',
+    },
+    {
+      componentId: 'cmp_metric_revenue',
+      title: 'MetricCard',
+      description: 'A basic metric card with optional unit/change/note.',
+    },
+    {
+      componentId: 'cmp_table',
+      title: 'DataTable + dataset',
+      description: 'Uses props.dataRef → sharedState.ui.datasets lookup.',
+    },
+    {
+      componentId: 'cmp_table_empty',
+      title: 'DataTable empty state',
+      description: 'Demonstrates host-side slots override in the demo registry.',
+    },
+    {
+      componentId: 'cmp_bar_chart',
+      title: 'BarChart + dataset',
+      description: 'Uses required dataset columns: label/value.',
+    },
+    {
+      componentId: 'cmp_chart',
+      title: 'Chart (viewer)',
+      description: 'Inline data (columns+rows) for token efficiency.',
+    },
+    {
+      componentId: 'cmp_line_chart',
+      title: 'LineChart',
+      description: 'Simple inline points example.',
+    },
+    {
+      componentId: 'cmp_citations',
+      title: 'CitationList',
+      description: 'Unsafe/invalid URLs are blocked in the renderer.',
+    },
+  ],
+  workflow: [
+    {
+      componentId: 'cmp_approval',
+      title: 'ApprovalCard',
+      description: 'Approve/deny sends ui.v1.event; server emits STATE_DELTA.',
+    },
+    {
+      componentId: 'cmp_form',
+      title: 'FormCard',
+      description: 'Edits + submit are server-authoritative (baseRevision enforced).',
+    },
+    {
+      componentId: 'cmp_chart_workflow',
+      title: 'Chart (interactive)',
+      description: 'Selection state is stored in component.state and updated by server.',
+    },
+  ],
+  lifecycle: [
+    {
+      componentId: 'cmp_lifecycle_metric',
+      title: 'building → ready',
+      description: 'Start as building (skeleton), then stream patches and flip to ready.',
+    },
+    {
+      componentId: 'cmp_error_demo',
+      title: 'error state',
+      description: 'Server can set status=error with viewer-safe details.',
+    },
+    {
+      componentId: 'cmp_unknown_demo',
+      title: 'unknown component',
+      description: 'Unregistered component type should never crash the page.',
+    },
+  ],
+} as const;
+
+function downloadText(filename: string, text: string, mime: string) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function openHtmlPreview(html: string) {
+  const w = window.open('', '_blank', 'noopener,noreferrer');
+  if (!w) return;
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+function createExportSnapshotV1(kernel: RivuKernel): RivuExportSnapshotV1 {
+  const state = kernel.getState();
+  return structuredClone({
+    schema: 'rivu.export.v1',
+    exportedAtMs: Date.now(),
+    lastSeq: state.lastSeq,
+    sharedState: state.sharedState,
+    messages: state.messageOrder.map((id) => state.messages[id]).filter(Boolean) as any,
+    toolCalls: state.toolCallOrder.map((id) => state.toolCalls[id]).filter(Boolean) as any,
+  });
+}
+
+function ExampleCard(props: {
+  kernel: RivuKernel;
+  host: ReturnType<typeof createHost>;
+  componentId: string;
+  title: string;
+  description: string;
+}) {
+  const component = useKernelState(props.kernel, (s) => selectUiComponentV1(s, props.componentId));
+
+  if (!component) {
+    return (
+      <div className="exampleCard">
+        <div className="exampleHeader">
+          <div className="exampleTitle">{props.title}</div>
+          <div className="hint">Component not found: {props.componentId}</div>
+        </div>
+      </div>
+    );
+  }
+
+  const status = component.status ?? 'ready';
+
+  return (
+    <div className="exampleCard">
+      <div className="exampleHeader">
+        <div style={{ minWidth: 0 }}>
+          <div className="exampleTitle">{props.title}</div>
+          <div className="hint" style={{ marginTop: 4 }}>
+            {props.description}
+          </div>
+        </div>
+        <div className="exampleMeta">
+          <span className="pill">{component.type}</span>
+          <span className="pill">v{component.schemaVersion}</span>
+          <span className="pill">rev {component.revision}</span>
+          <span className="pill">{status}</span>
+        </div>
+      </div>
+
+      <div className="exampleBody">
+        <ComponentRenderer kernel={props.kernel} host={props.host} componentId={props.componentId} />
+      </div>
+
+      <details className="exampleDetails">
+        <summary className="detailsSummary">Raw component JSON</summary>
+        <pre>{JSON.stringify({ componentId: props.componentId, ...component }, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
 
 function MessageCard(props: {
   kernel: RivuKernel;
-  registry: ReturnType<typeof createRegistry>;
+  host: ReturnType<typeof createHost>;
   messageId: string;
   selected: boolean;
   onSelect: (messageId: string) => void;
@@ -53,12 +251,7 @@ function MessageCard(props: {
       {inlineMounted.length ? (
         <div className="mounts">
           {inlineMounted.map((m) => (
-            <ComponentRenderer
-              key={m.componentId}
-              kernel={props.kernel}
-              registry={props.registry}
-              componentId={m.componentId}
-            />
+            <ComponentRenderer key={m.componentId} kernel={props.kernel} host={props.host} componentId={m.componentId} />
           ))}
         </div>
       ) : null}
@@ -66,15 +259,16 @@ function MessageCard(props: {
   );
 }
 
-function SidebarMounts(props: { kernel: RivuKernel; registry: ReturnType<typeof createRegistry>; messageId: string }) {
+function SidebarMounts(props: { kernel: RivuKernel; host: ReturnType<typeof createHost>; messageId: string }) {
   const sidebarMounted = useKernelState(props.kernel, (s) =>
     selectMountedUiComponentsV1({ state: s, messageId: props.messageId, slot: 'sidebar' }),
   );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {sidebarMounted.length ? (
         sidebarMounted.map((m) => (
-          <ComponentRenderer key={m.componentId} kernel={props.kernel} registry={props.registry} componentId={m.componentId} />
+          <ComponentRenderer key={m.componentId} kernel={props.kernel} host={props.host} componentId={m.componentId} />
         ))
       ) : (
         <div className="hint">No sidebar mounts for this message.</div>
@@ -83,123 +277,10 @@ function SidebarMounts(props: { kernel: RivuKernel; registry: ReturnType<typeof 
   );
 }
 
-function downloadText(filename: string, text: string, mime: string) {
-  const blob = new Blob([text], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function ExportMenu(props: { kernel: RivuKernel; registry: ReturnType<typeof createRegistry> }) {
-  return (
-    <details style={{ position: 'relative' }}>
-      <summary className="btn" style={{ listStyle: 'none' }}>
-        Export
-      </summary>
-      <div
-        style={{
-          position: 'absolute',
-          right: 0,
-          top: 'calc(100% + 8px)',
-          zIndex: 50,
-          minWidth: 220,
-          padding: 10,
-          borderRadius: 12,
-          border: '1px solid var(--rivu-border, #e5e7eb)',
-          background: 'var(--rivu-bg, #fff)',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-        }}
-      >
-        <button
-          className="btn"
-          type="button"
-          onClick={() => {
-            const state = props.kernel.getState();
-            const snapshot = {
-              schema: 'rivu.export.v1',
-              exportedAtMs: Date.now(),
-              lastSeq: state.lastSeq,
-              sharedState: state.sharedState,
-              messages: state.messageOrder.map((id) => state.messages[id]).filter(Boolean),
-              toolCalls: state.toolCallOrder.map((id) => state.toolCalls[id]).filter(Boolean),
-            };
-            downloadText('rivu-export.json', JSON.stringify(snapshot, null, 2), 'application/json');
-          }}
-        >
-          Download JSON
-        </button>
-
-        <button
-          className="btn"
-          type="button"
-          onClick={() => {
-            const state = props.kernel.getState();
-            const snapshot = {
-              schema: 'rivu.export.v1',
-              exportedAtMs: Date.now(),
-              lastSeq: state.lastSeq,
-              sharedState: state.sharedState,
-              messages: state.messageOrder
-                .map((id) => state.messages[id])
-                .filter(Boolean)
-                .map((m) => ({ id: m!.id, role: m!.role, content: m!.content, status: m!.status })),
-              toolCalls: state.toolCallOrder
-                .map((id) => state.toolCalls[id])
-                .filter(Boolean)
-                .map((t) => ({
-                  id: t!.id,
-                  name: t!.name,
-                  args: t!.args,
-                  status: t!.status,
-                  parentMessageId: t!.parentMessageId,
-                  resultMessageId: t!.resultMessageId,
-                })),
-            };
-
-            const html = exportHtmlV1({ snapshot, registry: props.registry, title: 'Rivu Viewer Export (Demo)' });
-            downloadText('rivu-export.html', html, 'text/html');
-          }}
-        >
-          Download HTML
-        </button>
-
-        <button
-          className="btn"
-          type="button"
-          onClick={() => {
-            const state = props.kernel.getState();
-            const snapshot = {
-              schema: 'rivu.export.v1',
-              exportedAtMs: Date.now(),
-              lastSeq: state.lastSeq,
-              sharedState: state.sharedState,
-              messages: [],
-              toolCalls: [],
-            };
-
-            const svgs = exportChartSvgsV1({ snapshot: snapshot as any, registry: props.registry });
-            const first = Object.entries(svgs)[0];
-            if (!first) return;
-            const [componentId, svg] = first;
-            downloadText(`${componentId}.svg`, svg, 'image/svg+xml');
-          }}
-        >
-          Download SVG (Chart)
-        </button>
-      </div>
-    </details>
-  );
-}
-
 type DemoEnvelope = { seq: number; event: { type: string; [k: string]: unknown } };
 
 type LongRunReport = {
+  maxReplayEvents: number;
   rawEvents: number;
   compactedEvents: number;
   rawSnapshots: number;
@@ -217,7 +298,9 @@ function replayAfter(envelopes: DemoEnvelope[], afterSeq: number): { complete: b
   if (!filtered.length) return { complete: true, envelopes: [] };
 
   const expectedFirst = afterSeq + 1;
-  if (filtered[0].seq !== expectedFirst) return { complete: false, envelopes: [] };
+  const first = filtered[0];
+  if (!first) return { complete: false, envelopes: [] };
+  if (first.seq !== expectedFirst) return { complete: false, envelopes: [] };
 
   const out: DemoEnvelope[] = [];
   let expected = expectedFirst;
@@ -305,9 +388,11 @@ function compactEnvelopesV1(envelopes: DemoEnvelope[], config: { maxReplayEvents
       if (config.maxReplayEvents > 0 && stateDeltasSinceSnapshot > config.maxReplayEvents) {
         let lastSnapshotSeq = 0;
         for (let i = out.length - 1; i >= 0; i -= 1) {
-          const t = (out[i].event as any).type;
+          const item = out[i];
+          if (!item) continue;
+          const t = (item.event as any).type;
           if (t === 'STATE_SNAPSHOT') {
-            lastSnapshotSeq = out[i].seq;
+            lastSnapshotSeq = item.seq;
             break;
           }
         }
@@ -328,7 +413,7 @@ function compactEnvelopesV1(envelopes: DemoEnvelope[], config: { maxReplayEvents
   return out;
 }
 
-function runLongRunSimulation(): LongRunReport {
+function runLongRunSimulation(params: { maxReplayEvents: number }): LongRunReport {
   const raw: DemoEnvelope[] = [];
   let seq = 0;
   const push = (event: DemoEnvelope['event']) => {
@@ -353,7 +438,7 @@ function runLongRunSimulation(): LongRunReport {
     push({ type: 'STATE_DELTA', delta: [{ op: 'replace', path: '/k', value: i }] });
   }
 
-  const compacted = compactEnvelopesV1(raw, { maxReplayEvents: 200 });
+  const compacted = compactEnvelopesV1(raw, { maxReplayEvents: params.maxReplayEvents });
 
   const resumeFrom = 0;
   const rawReplay = replayAfter(raw, resumeFrom);
@@ -366,6 +451,7 @@ function runLongRunSimulation(): LongRunReport {
   const compactedSnapshots = compacted.filter((e) => e.event.type === 'STATE_SNAPSHOT').length;
 
   return {
+    maxReplayEvents: params.maxReplayEvents,
     rawEvents: raw.length,
     compactedEvents: compacted.length,
     rawSnapshots,
@@ -378,63 +464,550 @@ function runLongRunSimulation(): LongRunReport {
   };
 }
 
-function LongRunMenu() {
-  const [report, setReport] = useState<LongRunReport | null>(null);
+function OverviewSection(props: {
+  kernel: RivuKernel;
+  host: ReturnType<typeof createHost>;
+  server: MockServer;
+  onSendCapabilities: () => void;
+  lastSentAtMs: number | null;
+}) {
+  const summary = useKernelState(props.kernel, (s) => {
+    const ui = selectUiStateV1(s);
+    return {
+      lastSeq: s.lastSeq,
+      needsResync: s.needsResync,
+      componentCount: ui ? Object.keys(ui.components).length : null,
+      datasetCount: ui?.datasets ? Object.keys(ui.datasets).length : 0,
+    };
+  });
+
+  const capabilities = useMemo(() => buildUiV1Capabilities(props.host), [props.host]);
 
   return (
-    <details style={{ position: 'relative' }}>
-      <summary className="btn" style={{ listStyle: 'none' }}>
-        Long Run
-      </summary>
-      <div
-        style={{
-          position: 'absolute',
-          right: 0,
-          top: 'calc(100% + 8px)',
-          zIndex: 50,
-          minWidth: 260,
-          padding: 10,
-          borderRadius: 12,
-          border: '1px solid var(--rivu-border, #e5e7eb)',
-          background: 'var(--rivu-bg, #fff)',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-        }}
-      >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="hint" style={{ lineHeight: 1.55 }}>
+        This demo is intentionally <b>server-authoritative</b>: the browser only renders <code>sharedState.ui</code> and sends{' '}
+        <code>CUSTOM(name=&quot;ui.v1.event&quot;)</code> actions. The in-browser mock server applies validation/concurrency rules and emits{' '}
+        <code>STATE_DELTA</code> patches back into the kernel.
+      </div>
+
+      <div className="calloutRow">
+        <div className="callout">
+          <div className="calloutTitle">Kernel</div>
+          <div className="calloutValue">lastSeq: {summary.lastSeq}</div>
+          <div className="calloutHint">needsResync: {String(summary.needsResync)}</div>
+        </div>
+        <div className="callout">
+          <div className="calloutTitle">UI State</div>
+          <div className="calloutValue">components: {summary.componentCount ?? '—'}</div>
+          <div className="calloutHint">datasets: {summary.datasetCount}</div>
+        </div>
+        <div className="callout">
+          <div className="calloutTitle">Capabilities</div>
+          <div className="calloutValue">{Object.keys(capabilities.components ?? {}).length} components</div>
+          <div className="calloutHint">Sent: {props.lastSentAtMs ? new Date(props.lastSentAtMs).toLocaleTimeString() : 'boot only'}</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button className="btn" type="button" onClick={props.onSendCapabilities}>
+          Send capabilities
+        </button>
         <button
           className="btn"
           type="button"
           onClick={() => {
-            setReport(runLongRunSimulation());
+            const snapshot = createExportSnapshotV1(props.kernel);
+            downloadText('rivu-export.json', JSON.stringify(snapshot, null, 2), 'application/json');
           }}
         >
+          Download export snapshot (JSON)
+        </button>
+      </div>
+
+      <details className="exampleDetails">
+        <summary className="detailsSummary">Computed ui.v1.capabilities (JSON)</summary>
+        <pre>{JSON.stringify(capabilities, null, 2)}</pre>
+      </details>
+    </div>
+  );
+}
+
+function ViewerSection(props: { kernel: RivuKernel; host: ReturnType<typeof createHost> }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="hint" style={{ lineHeight: 1.55 }}>
+        Viewer components should be <b>stateless</b> and replayable: render-only, deterministic, and safe for export/offline review.
+      </div>
+
+      <div className="exampleGrid">
+        {EXAMPLES.viewer.map((ex) => (
+          <ExampleCard key={ex.componentId} kernel={props.kernel} host={props.host} componentId={ex.componentId} title={ex.title} description={ex.description} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WorkflowSection(props: { kernel: RivuKernel; host: ReturnType<typeof createHost> }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="hint" style={{ lineHeight: 1.55 }}>
+        Workflow components are <b>stateful</b>: UI interactions send <code>ui.v1.event</code> with <code>clientRequestId</code> +{' '}
+        <code>baseRevision</code>, and the server commits updates via <code>STATE_DELTA</code>.
+      </div>
+
+      <div className="exampleGrid">
+        {EXAMPLES.workflow.map((ex) => (
+          <ExampleCard key={ex.componentId} kernel={props.kernel} host={props.host} componentId={ex.componentId} title={ex.title} description={ex.description} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DatasetsSection(props: { kernel: RivuKernel; host: ReturnType<typeof createHost>; server: MockServer }) {
+  const datasetId = 'ds_revenue_by_channel';
+  const dataset = useKernelState(props.kernel, (s) => selectUiDatasetV1(s, datasetId));
+  const [error, setError] = useState<string | null>(null);
+
+  const mutate = (fn: (current: NonNullable<typeof dataset>) => Array<Array<string | number | null>>) => {
+    setError(null);
+    if (!dataset) {
+      setError(`Dataset missing: ${datasetId}`);
+      return;
+    }
+    try {
+      const nextRows = fn(dataset);
+      props.server.setDatasetRows(datasetId, nextRows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="hint" style={{ lineHeight: 1.55 }}>
+        Datasets live in <code>sharedState.ui.datasets</code>. Components can reference them via <code>props.dataRef</code> to avoid repeating data
+        across many components.
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          className="btn"
+          type="button"
+          onClick={() =>
+            mutate((current) => {
+              const valueIndex = current.columns.indexOf('value');
+              if (valueIndex < 0) throw new Error('dataset missing column: value');
+              return current.rows.map((row) => {
+                const next = [...row] as Array<string | number | null>;
+                const v = next[valueIndex];
+                if (typeof v === 'number' && Number.isFinite(v)) {
+                  const factor = 0.8 + Math.random() * 0.6;
+                  next[valueIndex] = Math.round(v * factor);
+                }
+                return next;
+              });
+            })
+          }
+        >
+          Randomize values
+        </button>
+        <button
+          className="btn"
+          type="button"
+          onClick={() =>
+            mutate((current) => {
+              const labelIndex = current.columns.indexOf('label');
+              const valueIndex = current.columns.indexOf('value');
+              if (labelIndex < 0 || valueIndex < 0) throw new Error('dataset requires label/value columns');
+              const nextRows = [...current.rows];
+              nextRows.push(
+                nextRows.length % 2 === 0 ? ['Social', 11_600] : ['Partners', 14_250],
+              );
+              return nextRows.map((row) => row.map((cell) => cell as any) as Array<string | number | null>);
+            })
+          }
+        >
+          Add a row
+        </button>
+        <button
+          className="btn"
+          type="button"
+          onClick={() => {
+            setError(null);
+            const initial = createInitialSharedState() as any;
+            const base = initial?.ui?.datasets?.[datasetId];
+            if (!base?.rows) {
+              setError('Could not load initial dataset baseline.');
+              return;
+            }
+            props.server.setDatasetRows(datasetId, structuredClone(base.rows));
+          }}
+        >
+          Reset dataset
+        </button>
+      </div>
+
+      {error ? <div className="errorBanner">{error}</div> : null}
+
+      <details className="exampleDetails" open>
+        <summary className="detailsSummary">Dataset JSON ({datasetId})</summary>
+        <pre>{JSON.stringify(dataset, null, 2)}</pre>
+      </details>
+
+      <div className="exampleGrid">
+        <ExampleCard kernel={props.kernel} host={props.host} componentId="cmp_table" title="DataTable + dataRef" description="Table resolves rows from dataset columns." />
+        <ExampleCard kernel={props.kernel} host={props.host} componentId="cmp_bar_chart" title="BarChart + dataRef" description="Chart resolves items from dataset label/value." />
+      </div>
+    </div>
+  );
+}
+
+function ChartsSection(props: { kernel: RivuKernel; host: ReturnType<typeof createHost> }) {
+  const workflowChart = useKernelState(props.kernel, (s) => selectUiComponentV1(s, 'cmp_chart_workflow'));
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const send = async (action: UiV1CustomEvent) => {
+    setActionError(null);
+    try {
+      await props.kernel.send(action);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const clearSelection = async () => {
+    if (!workflowChart) return;
+    await send({
+      type: 'CUSTOM',
+      name: UI_V1_EVENT_NAME,
+      value: {
+        componentId: 'cmp_chart_workflow',
+        eventName: 'chart.clearSelection',
+        payload: {},
+        clientRequestId: createClientRequestId(),
+        baseRevision: workflowChart.revision,
+      },
+    });
+  };
+
+  const selectFirstPoint = async () => {
+    if (!workflowChart) return;
+    await send({
+      type: 'CUSTOM',
+      name: UI_V1_EVENT_NAME,
+      value: {
+        componentId: 'cmp_chart_workflow',
+        eventName: 'chart.setSelection',
+        payload: { selection: { kind: 'point', rowIndex: 0 } },
+        clientRequestId: createClientRequestId(),
+        baseRevision: workflowChart.revision,
+      },
+    });
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="hint" style={{ lineHeight: 1.55 }}>
+        <code>Chart</code> supports compact data (<code>columns + rows</code>) and optional v1 interactions. When <code>component.state</code> exists,
+        the renderer enables selection events that round-trip via <code>ui.v1.event</code>.
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button className="btn" type="button" onClick={() => void selectFirstPoint()}>
+          Select first bar (server)
+        </button>
+        <button className="btn" type="button" onClick={() => void clearSelection()}>
+          Clear selection (server)
+        </button>
+      </div>
+
+      {actionError ? <div className="errorBanner">{actionError}</div> : null}
+
+      <details className="exampleDetails" open>
+        <summary className="detailsSummary">Workflow chart selection state (cmp_chart_workflow)</summary>
+        <pre>{JSON.stringify(workflowChart?.state ?? null, null, 2)}</pre>
+      </details>
+
+      <div className="exampleGrid">
+        <ExampleCard kernel={props.kernel} host={props.host} componentId="cmp_chart" title="Chart (viewer)" description="Inline data; no state → not interactive." />
+        <ExampleCard kernel={props.kernel} host={props.host} componentId="cmp_chart_workflow" title="Chart (workflow + interactions)" description="Click bars or brush a range to update selection." />
+      </div>
+    </div>
+  );
+}
+
+function LifecycleSection(props: { kernel: RivuKernel; host: ReturnType<typeof createHost> }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="hint" style={{ lineHeight: 1.55 }}>
+        Components can be mounted early with <code>status=&quot;building&quot;</code> and later streamed to <code>ready</code> using patches. When ready,
+        props/state must validate against the client registry schemas.
+      </div>
+
+      <div className="exampleGrid">
+        {EXAMPLES.lifecycle.map((ex) => (
+          <ExampleCard key={ex.componentId} kernel={props.kernel} host={props.host} componentId={ex.componentId} title={ex.title} description={ex.description} />
+        ))}
+      </div>
+
+      <div className="hint">
+        Tip: click <b>Reset</b> in the top bar to replay the lifecycle stream from the beginning.
+      </div>
+    </div>
+  );
+}
+
+function ExportSection(props: { kernel: RivuKernel; host: ReturnType<typeof createHost> }) {
+  const [snapshot, setSnapshot] = useState<RivuExportSnapshotV1 | null>(null);
+  const [html, setHtml] = useState<string | null>(null);
+  const [svgs, setSvgs] = useState<Record<string, string> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const ensureSnapshot = () => {
+    const next = createExportSnapshotV1(props.kernel);
+    setSnapshot(next);
+    return next;
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="hint" style={{ lineHeight: 1.55 }}>
+        Export is snapshot-based: generate a deterministic JSON snapshot (<code>rivu.export.v1</code>), then derive HTML/SVG/PDF without replay.
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          className="btn"
+          type="button"
+          onClick={() => {
+            setError(null);
+            setHtml(null);
+            setSvgs(null);
+            setSnapshot(ensureSnapshot());
+          }}
+        >
+          Generate snapshot
+        </button>
+        <button
+          className="btn"
+          type="button"
+          onClick={() => {
+            setError(null);
+            const s = snapshot ?? ensureSnapshot();
+            downloadText('rivu-export.json', JSON.stringify(s, null, 2), 'application/json');
+          }}
+        >
+          Download JSON
+        </button>
+        <button
+          className="btn"
+          type="button"
+          onClick={() => {
+            setError(null);
+            try {
+              const s = snapshot ?? ensureSnapshot();
+              const out = exportHtmlV1({ snapshot: s, host: props.host, title: 'Rivu Viewer Export (Demo)' });
+              setHtml(out);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : String(err));
+            }
+          }}
+        >
+          Generate HTML
+        </button>
+        <button
+          className="btn"
+          type="button"
+          disabled={!html}
+          onClick={() => {
+            if (!html) return;
+            openHtmlPreview(html);
+          }}
+        >
+          Open HTML
+        </button>
+        <button
+          className="btn"
+          type="button"
+          disabled={!html}
+          onClick={() => {
+            if (!html) return;
+            downloadText('rivu-export.html', html, 'text/html');
+          }}
+        >
+          Download HTML
+        </button>
+        <button
+          className="btn"
+          type="button"
+          onClick={() => {
+            setError(null);
+            try {
+              const s = snapshot ?? ensureSnapshot();
+              setSvgs(exportChartSvgsV1({ snapshot: s as any, host: props.host }));
+            } catch (err) {
+              setError(err instanceof Error ? err.message : String(err));
+            }
+          }}
+        >
+          Export chart SVGs
+        </button>
+      </div>
+
+      {error ? <div className="errorBanner">{error}</div> : null}
+
+      {snapshot ? (
+        <details className="exampleDetails">
+          <summary className="detailsSummary">Snapshot JSON</summary>
+          <pre>{JSON.stringify(snapshot, null, 2)}</pre>
+        </details>
+      ) : null}
+
+      {html ? (
+        <details className="exampleDetails">
+          <summary className="detailsSummary">HTML (first 2 KB)</summary>
+          <pre>{html.slice(0, 2048)}{html.length > 2048 ? '\n…' : ''}</pre>
+        </details>
+      ) : null}
+
+      {svgs ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="hint">Exported SVGs: {Object.keys(svgs).length}</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {Object.entries(svgs).map(([componentId, svg]) => (
+              <button key={componentId} className="btn" type="button" onClick={() => downloadText(`${componentId}.svg`, svg, 'image/svg+xml')}>
+                Download {componentId}.svg
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CompactionSection() {
+  const [maxReplayEvents, setMaxReplayEvents] = useState(200);
+  const [report, setReport] = useState<LongRunReport | null>(null);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="hint" style={{ lineHeight: 1.55 }}>
+        Compaction is a <b>server-side storage boundary</b> optimization: merge streaming chunk events and periodically snapshot sharedState to bound
+        replay cost. If compaction introduces <code>seq</code> gaps, resume should fall back to a single <code>STATE_SNAPSHOT</code>.
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <label className="hint" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          maxReplayEvents
+          <input
+            type="number"
+            min={0}
+            step={50}
+            value={maxReplayEvents}
+            onChange={(e) => setMaxReplayEvents(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+            className="input"
+            style={{ width: 120 }}
+          />
+        </label>
+        <button className="btn" type="button" onClick={() => setReport(runLongRunSimulation({ maxReplayEvents }))}>
           Run simulation
         </button>
+      </div>
 
-        {report ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-            <div>
-              Persisted envelopes: <b>{report.rawEvents.toLocaleString()}</b> → <b>{report.compactedEvents.toLocaleString()}</b>
+      {report ? (
+        <div className="calloutRow">
+          <div className="callout">
+            <div className="calloutTitle">Persisted envelopes</div>
+            <div className="calloutValue">
+              {report.rawEvents.toLocaleString()} → {report.compactedEvents.toLocaleString()}
             </div>
-            <div>
-              Snapshots: <b>{report.rawSnapshots}</b> → <b>{report.compactedSnapshots}</b>
+            <div className="calloutHint">maxReplayEvents={report.maxReplayEvents}</div>
+          </div>
+          <div className="callout">
+            <div className="calloutTitle">Snapshots</div>
+            <div className="calloutValue">
+              {report.rawSnapshots} → {report.compactedSnapshots}
             </div>
-            <div>
-              ResumeFrom={report.resumeFrom}: raw=<b>{report.rawResumeKind}</b> ({report.rawEnvelopesToSend.toLocaleString()} envelopes)
+            <div className="calloutHint">Inserted to cap replay</div>
+          </div>
+          <div className="callout">
+            <div className="calloutTitle">ResumeFrom=0</div>
+            <div className="calloutValue">
+              raw {report.rawResumeKind} / compact {report.compactedResumeKind}
             </div>
-            <div>
-              ResumeFrom={report.resumeFrom}: compacted=<b>{report.compactedResumeKind}</b> ({report.compactedEnvelopesToSend.toLocaleString()} envelopes)
-            </div>
-            <div style={{ opacity: 0.75, lineHeight: 1.35 }}>
-              Note: compaction can introduce seq gaps; when replay is not contiguous, servers should fall back to a single{' '}
-              <code>STATE_SNAPSHOT</code>.
+            <div className="calloutHint">
+              {report.rawEnvelopesToSend.toLocaleString()} vs {report.compactedEnvelopesToSend.toLocaleString()} envelopes to send
             </div>
           </div>
-        ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DocsSection() {
+  const links: Array<{ title: string; path: string; note: string }> = [
+    { title: 'Integration quickstart', path: 'docs/integration-quickstart.md', note: 'Canonical SSE/WS + resumeFrom baseline.' },
+    { title: 'Integration guide', path: 'docs/integration.md', note: 'Kernel + registry + lifecycle + component catalog.' },
+    { title: 'Viewer export', path: 'docs/viewer-export.md', note: 'Snapshot → HTML/SVG/PDF export pipeline.' },
+    { title: 'Export & review', path: 'docs/export-review.md', note: 'Snapshot/export baseline and restoration.' },
+    { title: 'Event compaction', path: 'docs/event-compaction.md', note: 'Server-side flush/merge + snapshot tuning.' },
+    { title: 'Design system', path: 'docs/design-system.md', note: 'Theme tokens + slots conventions.' },
+    { title: 'A2UI bridge', path: 'docs/a2ui-bridge.md', note: 'Agent-to-UI compact ops compiled into safe /ui patches.' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="hint">Docs live in-repo. Open these files in your editor:</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
+        {links.map((l) => (
+          <div key={l.path} className="docCard">
+            <div style={{ fontWeight: 750 }}>{l.title}</div>
+            <div className="hint" style={{ marginTop: 4 }}>
+              <code>{l.path}</code>
+            </div>
+            <div className="hint" style={{ marginTop: 8, lineHeight: 1.45 }}>
+              {l.note}
+            </div>
+          </div>
+        ))}
       </div>
-    </details>
+    </div>
+  );
+}
+
+function ChatSection(props: {
+  kernel: RivuKernel;
+  host: ReturnType<typeof createHost>;
+  selectedMessageId: string;
+  onSelectMessageId: (messageId: string) => void;
+}) {
+  const messageIds = useKernelState(props.kernel, (s) => s.messageOrder);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="hint" style={{ lineHeight: 1.55 }}>
+        This view demonstrates mounts-based embedding: UI components are placed into message slots (e.g. <code>inline</code> / <code>sidebar</code>)
+        via <code>sharedState.ui.components[...].mounts</code>.
+      </div>
+
+      <div className="chat">
+        {messageIds.map((id) => (
+          <MessageCard
+            key={id}
+            kernel={props.kernel}
+            host={props.host}
+            messageId={id}
+            selected={id === props.selectedMessageId}
+            onSelect={props.onSelectMessageId}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -446,40 +1019,130 @@ export function App() {
         ...workflowRegistryV1,
         [DATA_TABLE_COMPONENT_TYPE]: {
           ...dataTableRegistrationV1,
-          render: ({ props }) => (
-            <DataTable
-              {...props}
-              slots={{
-                EmptyState: () => (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ fontWeight: 750 }}>Custom empty state</div>
-                    <div style={{ fontSize: 12, opacity: 0.85 }}>Rendered via `slots.EmptyState` (host-side override).</div>
-                  </div>
-                ),
-                Cell: ({ value, column }) => {
-                  if (value === null) return '';
-                  if (column.key === 'amount' && typeof value === 'number') {
-                    return value.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-                  }
-                  if (typeof value === 'number') return value.toLocaleString();
-                  return value;
-                },
-              }}
-            />
-          ),
+          render: ({ kernel, host, componentId, componentType, schemaVersion, props }) => {
+            const hooks = host.renderHooks;
+            const meta = { componentId, componentType };
+            const slots = {
+              EmptyState: () => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ fontWeight: 750 }}>Custom empty state</div>
+                  <div style={{ fontSize: 12, opacity: 0.85 }}>Rendered via `slots.EmptyState` (host-side override).</div>
+                </div>
+              ),
+              Cell: ({
+                value,
+                column,
+                rowIndex,
+              }: {
+                value: string | number | null;
+                column: { key: string };
+                rowIndex: number;
+              }) => {
+                if (value === null) return '';
+                const path = `rows[${rowIndex}].${column.key}`;
+                if (column.key === 'amount' && typeof value === 'number') {
+                  return hooks.formatCurrency(value, { ...meta, path, currency: 'USD' });
+                }
+                if (typeof value === 'number') return hooks.formatNumber(value, { ...meta, path });
+                if (typeof value === 'string') return hooks.formatValue(value, { ...meta, path });
+                return hooks.formatValue(value, { ...meta, path });
+              },
+            };
+
+            if (props.dataRef) {
+              const datasetId = props.dataRef.datasetId;
+              const dataset = selectUiDatasetV1(kernel.getState(), datasetId);
+              if (!dataset) {
+                return (
+                  <UnknownComponentCard
+                    title="Dataset not found"
+                    componentId={componentId}
+                    componentType={componentType}
+                    schemaVersion={schemaVersion}
+                    details={{ datasetId }}
+                  />
+                );
+              }
+
+              const indexes = new Map(dataset.columns.map((name, i) => [name, i] as const));
+              const missingColumns = props.columns
+                .filter((col: { key: string }) => !indexes.has(col.key))
+                .map((col: { key: string }) => col.key);
+              if (missingColumns.length > 0) {
+                return (
+                  <UnknownComponentCard
+                    title="Dataset column mismatch"
+                    componentId={componentId}
+                    componentType={componentType}
+                    schemaVersion={schemaVersion}
+                    details={{ datasetId, missingColumns, datasetColumns: dataset.columns }}
+                  />
+                );
+              }
+
+              const resolvedRows = dataset.rows.map((row) => {
+                const out: Record<string, string | number | null> = {};
+                for (const col of props.columns) {
+                  out[col.key] = (row[indexes.get(col.key)!] as any) ?? null;
+                }
+                return out;
+              });
+
+              return <DataTable {...props} rows={resolvedRows} slots={slots as any} />;
+            }
+
+            return <DataTable {...props} slots={slots as any} />;
+          },
         },
       }),
     [],
   );
+  const [compactNumbers, setCompactNumbers] = useState(false);
+  const [strictUrlSanitizer, setStrictUrlSanitizer] = useState(false);
+
+  const host = useMemo(() => {
+    const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
+    return createHost({
+      registry,
+      renderHooks: {
+        ...(compactNumbers
+          ? {
+              formatNumber: (value) => compact.format(value),
+            }
+          : {}),
+        ...(strictUrlSanitizer
+          ? {
+              sanitizeUrl: (rawUrl) => {
+                const url = defaultRenderHooks.sanitizeUrl(rawUrl);
+                if (!url) return null;
+                try {
+                  const parsed = new URL(url);
+                  // Demo: show that hosts can tighten policy beyond the default allowlist.
+                  if (parsed.protocol !== 'https:') return null;
+                  if (parsed.hostname !== 'example.com') return null;
+                  return url;
+                } catch {
+                  return null;
+                }
+              },
+            }
+          : {}),
+      },
+    });
+  }, [registry, compactNumbers, strictUrlSanitizer]);
 
   const [resetKey, setResetKey] = useState(0);
   const [showInspector, setShowInspector] = useState(true);
   const [theme, setTheme] = useState<'default' | 'brand' | 'dark'>('default');
+  const [section, setSection] = useState<SectionId>('overview');
+  const [selectedMessageId, setSelectedMessageId] = useState<string>(DEMO_MESSAGE_IDS.assistant1);
+  const [capSentAtMs, setCapSentAtMs] = useState<number | null>(null);
 
   const themeVars: Record<string, string> | undefined = useMemo(() => {
     if (theme === 'default') return undefined;
     if (theme === 'brand') {
       return {
+        colorScheme: 'light',
         '--rivu-border': '#c4b5fd',
         '--rivu-border-muted': '#ddd6fe',
         '--rivu-bg-muted': '#faf5ff',
@@ -514,11 +1177,11 @@ export function App() {
     };
   }, [theme]);
 
-  const { kernel, bootstrap } = useMemo(() => {
+  const { kernel, server, bootstrap } = useMemo(() => {
     const sharedState = createInitialSharedState();
     const bootstrapEnvelopes = createBootstrapEnvelopes(sharedState);
 
-    let server: ReturnType<typeof createMockServer> | null = null;
+    let server: MockServer | null = null;
     const kernel = createKernel({
       actionTransport: async (action) => {
         if (!server) throw new Error('server not ready');
@@ -528,41 +1191,59 @@ export function App() {
 
     server = createMockServer({ kernel, initialSharedState: sharedState, bootstrapEnvelopes });
 
+    const sendCapabilities = async () => {
+      const capabilitiesHost = createHost({ registry });
+      const capabilitiesEvent = {
+        type: 'CUSTOM',
+        name: 'ui.v1.capabilities',
+        value: { ...buildUiV1Capabilities(capabilitiesHost), client: { framework: 'react', runtime: 'rivu-react-demo' } },
+      } as const;
+      await server!.capabilitiesTransport(capabilitiesEvent as any);
+    };
+
     return {
       kernel,
-      bootstrap: () => {
-        void server!.capabilitiesTransport({
-          type: 'CUSTOM',
-          name: 'ui.v1.capabilities',
-          value: { ...buildUiV1Capabilities(registry), client: { framework: 'react', runtime: 'rivu-react-demo' } },
-        });
+      server,
+      bootstrap: async () => {
+        await sendCapabilities();
         server!.bootstrap();
       },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetKey]);
-
-  const messageIds = useKernelState(kernel, (s) => s.messageOrder);
-  const [selectedMessageId, setSelectedMessageId] = useState<string>(DEMO_MESSAGE_IDS.assistant1);
+  }, [resetKey, registry]);
 
   useEffect(() => {
-    bootstrap();
+    void bootstrap();
     setSelectedMessageId(DEMO_MESSAGE_IDS.assistant1);
+    setCapSentAtMs(Date.now());
   }, [bootstrap]);
+
+  const onSendCapabilities = () => {
+    void (async () => {
+      await server.capabilitiesTransport({
+        type: 'CUSTOM',
+        name: 'ui.v1.capabilities',
+        value: { ...buildUiV1Capabilities(host), client: { framework: 'react', runtime: 'rivu-react-demo' } },
+      } as any);
+      setCapSentAtMs(Date.now());
+    })();
+  };
+
+  const sectionMeta = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0]!;
 
   return (
     <div className="app" style={themeVars as any}>
       <div className="topbar">
-        <div className="brand">Rivu React Demo</div>
-        <div className="hint">Viewer + Workflow components with `sharedState.ui` mounts and a mock server-authoritative loop.</div>
+        <div className="brand">Rivu Examples</div>
+        <div className="hint">{sectionMeta.label}: {sectionMeta.description}</div>
         <div className="spacer" />
-        <LongRunMenu />
-        <ExportMenu kernel={kernel} registry={registry} />
-        <button
-          className="btn"
-          type="button"
-          onClick={() => setTheme((t) => (t === 'default' ? 'brand' : t === 'brand' ? 'dark' : 'default'))}
-        >
+        <button className="btn" type="button" onClick={() => setCompactNumbers((v) => !v)}>
+          Formatter: {compactNumbers ? 'compact' : 'default'}
+        </button>
+        <button className="btn" type="button" onClick={() => setStrictUrlSanitizer((v) => !v)}>
+          URL sanitizer: {strictUrlSanitizer ? 'strict' : 'default'}
+        </button>
+        <button className="btn" type="button" onClick={() => setTheme((t) => (t === 'default' ? 'brand' : t === 'brand' ? 'dark' : 'default'))}>
           Theme: {theme}
         </button>
         <button className="btn" type="button" onClick={() => setShowInspector((v) => !v)}>
@@ -573,43 +1254,70 @@ export function App() {
         </button>
       </div>
 
-      <div className="layout">
+      <div className={`layout ${showInspector ? '' : 'layoutNoInspector'}`}>
+        <div className="panel nav" role="navigation" aria-label="Examples navigation">
+          <div className="panelHeader">
+            <div className="panelTitle">Sections</div>
+            <div className="hint">Interactive, categorized examples</div>
+          </div>
+          <div className="panelBody navBody">
+            {SECTIONS.map((s) => (
+              <button
+                key={s.id}
+                className={`navItem ${section === s.id ? 'navItemActive' : ''}`}
+                type="button"
+                onClick={() => setSection(s.id)}
+              >
+                <div className="navItemLabel">{s.label}</div>
+                <div className="navItemDesc">{s.description}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="panel">
           <div className="panelHeader">
-            <div className="panelTitle">Chat (inline mounts)</div>
-            <div className="hint">Click a message to change the sidebar.</div>
+            <div className="panelTitle">{sectionMeta.label}</div>
+            <div className="hint">{sectionMeta.description}</div>
           </div>
           <div className="panelBody">
-            <div className="chat">
-              {messageIds.map((id) => (
-                <MessageCard
-                  key={id}
-                  kernel={kernel}
-                  registry={registry}
-                  messageId={id}
-                  selected={id === selectedMessageId}
-                  onSelect={setSelectedMessageId}
-                />
-              ))}
+            {section === 'overview' ? (
+              <OverviewSection kernel={kernel} host={host} server={server} onSendCapabilities={onSendCapabilities} lastSentAtMs={capSentAtMs} />
+            ) : null}
+            {section === 'viewer' ? <ViewerSection kernel={kernel} host={host} /> : null}
+            {section === 'workflow' ? <WorkflowSection kernel={kernel} host={host} /> : null}
+            {section === 'datasets' ? <DatasetsSection kernel={kernel} host={host} server={server} /> : null}
+            {section === 'charts' ? <ChartsSection kernel={kernel} host={host} /> : null}
+            {section === 'lifecycle' ? <LifecycleSection kernel={kernel} host={host} /> : null}
+            {section === 'export' ? <ExportSection kernel={kernel} host={host} /> : null}
+            {section === 'compaction' ? <CompactionSection /> : null}
+            {section === 'chat' ? (
+              <ChatSection kernel={kernel} host={host} selectedMessageId={selectedMessageId} onSelectMessageId={setSelectedMessageId} />
+            ) : null}
+            {section === 'docs' ? <DocsSection /> : null}
+          </div>
+        </div>
+
+        {showInspector ? (
+          <div className="panel">
+            <div className="panelHeader">
+              <div className="panelTitle">{section === 'chat' ? 'Sidebar mounts + Inspector' : 'Inspector'}</div>
+              <div className="hint">Kernel state + outbox + ui summary</div>
+            </div>
+            <div className="panelBody">
+              {section === 'chat' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <SidebarMounts kernel={kernel} host={host} messageId={selectedMessageId} />
+                  <div style={{ borderTop: '1px solid var(--rivu-border-muted, #f1f5f9)', paddingTop: 12 }}>
+                    <ProtocolInspector kernel={kernel} />
+                  </div>
+                </div>
+              ) : (
+                <ProtocolInspector kernel={kernel} />
+              )}
             </div>
           </div>
-        </div>
-
-        <div className="panel">
-          <div className="panelHeader">
-            <div className="panelTitle">Sidebar mounts</div>
-            <div className="hint">{selectedMessageId}</div>
-          </div>
-          <div className="panelBody">
-            <SidebarMounts kernel={kernel} registry={registry} messageId={selectedMessageId} />
-
-            {showInspector ? (
-              <div style={{ marginTop: 12 }}>
-                <ProtocolInspector kernel={kernel} />
-              </div>
-            ) : null}
-          </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );

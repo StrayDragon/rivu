@@ -1,7 +1,7 @@
 # ui-datasets Specification
 
 ## Purpose
-TBD - created by archiving change ui-datasets-v1. Update Purpose after archive.
+Define `sharedState.ui.datasets` and `dataRef` so multiple UI components can share token-efficient columnar datasets in a replayable, exportable way.
 ## Requirements
 ### Requirement: UI datasets exist under `sharedState.ui.datasets` (v1)
 系统 MUST 在 `sharedState.ui` 下支持 `datasets` 字段：
@@ -46,4 +46,3 @@ Viewer 组件（例如 `DataTable`、`Chart`）MUST 支持通过 `dataRef` 引�
 #### Scenario: Missing dataset shows viewer-safe fallback
 - **WHEN** 一个组件引用了不存在的 `datasetId`
 - **THEN** UI 展示可诊断的降级信息（例如“Dataset not found”）且页面保持可用
-

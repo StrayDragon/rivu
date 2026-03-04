@@ -7,8 +7,14 @@ export { protocolInspectorStore } from './protocol-inspector-store.js';
 
 export { createClientRequestId } from './client-request-id.js';
 
-export type { RivuSvelteComponentProps, RivuSvelteComponentRegistration, RivuSvelteComponentRegistry } from './registry.js';
-export { createRegistry } from './registry.js';
+export type { RivuSvelteComponentProps, RivuSvelteComponentRegistration, RivuSvelteComponentRegistry, RivuSvelteHost } from './registry.js';
+export { createHost, createRegistry } from './registry.js';
+
+export type { RivuComponentMeta, RivuCodeMeta, RivuFormatMeta, RivuMarkdownMeta, RivuRenderHooks, RivuRenderedText } from './render-hooks.js';
+export { defaultRenderHooks, mergeRenderHooks } from './render-hooks.js';
+
+export type { RivuSlotPropOverrides, RivuSlotProps } from './slot-props.js';
+export { applySlotProps } from './slot-props.js';
 
 export { componentRendererStore } from './component-renderer-store.js';
 

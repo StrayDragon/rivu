@@ -5,7 +5,7 @@ import type { Component } from 'svelte';
 import { createKernel } from 'rivu-kernel';
 import { uiDataRefV1Schema } from 'rivu-ui-spec';
 
-import { createRegistry, kernelStore, resolveUiComponentV1 } from '../src/index.js';
+import { createHost, createRegistry, kernelStore, resolveUiComponentV1 } from '../src/index.js';
 
 const DummyComponent = ((_: any, __: any) => ({})) as unknown as Component<any>;
 
@@ -48,7 +48,7 @@ test('resolveUiComponentV1 degrades gracefully for unknown type / invalid props'
   });
 
   const unknownRegistry = createRegistry({});
-  const unknown = resolveUiComponentV1({ state: kernel.getState(), registry: unknownRegistry, componentId: 'cmp_1' });
+  const unknown = resolveUiComponentV1({ state: kernel.getState(), host: createHost({ registry: unknownRegistry }), componentId: 'cmp_1' });
   expect(unknown.status).toBe('unknown_type');
 
   const registry = createRegistry({
@@ -58,8 +58,96 @@ test('resolveUiComponentV1 degrades gracefully for unknown type / invalid props'
       Component: DummyComponent,
     },
   });
-  const invalidProps = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_1' });
+  const invalidProps = resolveUiComponentV1({ state: kernel.getState(), host: createHost({ registry }), componentId: 'cmp_1' });
   expect(invalidProps.status).toBe('invalid_props');
+});
+
+test('resolveUiComponentV1 applies host sanitizeComponentProps', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_1: {
+              type: 'Demo',
+              schemaVersion: 1,
+              props: { foo: 'ok' },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const registry = createRegistry({
+    Demo: {
+      schemaVersion: 1,
+      propsSchema: z.object({ foo: z.string() }),
+      Component: DummyComponent,
+    },
+  });
+
+  const host = createHost({
+    registry,
+    renderHooks: {
+      sanitizeComponentProps: (_meta, props) => ({ ...props, foo: 'sanitized' }),
+    },
+  });
+
+  const resolved = resolveUiComponentV1({ state: kernel.getState(), host, componentId: 'cmp_1' });
+  expect(resolved.status).toBe('ok');
+  expect((resolved as any).props.foo).toBe('sanitized');
+});
+
+test('resolveUiComponentV1 degrades when host sanitizer blocks props', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_1: {
+              type: 'Demo',
+              schemaVersion: 1,
+              props: { foo: 'ok' },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const registry = createRegistry({
+    Demo: {
+      schemaVersion: 1,
+      propsSchema: z.object({ foo: z.string() }),
+      Component: DummyComponent,
+    },
+  });
+
+  const host = createHost({
+    registry,
+    renderHooks: {
+      sanitizeComponentProps: () => {
+        throw new Error('blocked');
+      },
+    },
+  });
+
+  const resolved = resolveUiComponentV1({ state: kernel.getState(), host, componentId: 'cmp_1' });
+  expect(resolved.status).toBe('invalid_props');
+  expect((resolved as any).details.reason).toBe('blocked_by_sanitizer');
 });
 
 test('resolveUiComponentV1 degrades on invalid state', () => {
@@ -95,7 +183,7 @@ test('resolveUiComponentV1 degrades on invalid state', () => {
     },
   });
 
-  const result = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_bad_state' });
+  const result = resolveUiComponentV1({ state: kernel.getState(), host: createHost({ registry }), componentId: 'cmp_bad_state' });
   expect(result.status).toBe('invalid_state');
 });
 
@@ -139,19 +227,20 @@ test('resolveUiComponentV1 respects lifecycle status (unknown > error > building
       Component: DummyComponent,
     },
   });
+  const host = createHost({ registry });
 
-  const building = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_building' });
+  const building = resolveUiComponentV1({ state: kernel.getState(), host, componentId: 'cmp_building' });
   expect(building.status).toBe('building');
   expect((building as any).revision).toBe(0);
   expect((building as any).hasState).toBe(false);
 
-  const error = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_error' });
+  const error = resolveUiComponentV1({ state: kernel.getState(), host, componentId: 'cmp_error' });
   expect(error.status).toBe('error');
   expect((error as any).revision).toBe(0);
   expect((error as any).hasState).toBe(false);
 
   const unknownRegistry = createRegistry({});
-  const unknownWins = resolveUiComponentV1({ state: kernel.getState(), registry: unknownRegistry, componentId: 'cmp_error' });
+  const unknownWins = resolveUiComponentV1({ state: kernel.getState(), host: createHost({ registry: unknownRegistry }), componentId: 'cmp_error' });
   expect(unknownWins.status).toBe('unknown_type');
 });
 
@@ -205,7 +294,7 @@ test('resolveUiComponentV1 resolves DataTable dataRef from sharedState.ui.datase
     },
   });
 
-  const resolved = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_table' });
+  const resolved = resolveUiComponentV1({ state: kernel.getState(), host: createHost({ registry }), componentId: 'cmp_table' });
   expect(resolved.status).toBe('ok');
   expect((resolved as any).revision).toBe(0);
   expect((resolved as any).hasState).toBe(false);
@@ -252,7 +341,7 @@ test('resolveUiComponentV1 degrades when dataRef dataset is missing', () => {
     },
   });
 
-  const resolved = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_table' });
+  const resolved = resolveUiComponentV1({ state: kernel.getState(), host: createHost({ registry }), componentId: 'cmp_table' });
   expect(resolved.status).toBe('invalid_props');
   expect((resolved as any).details.reason).toBe('dataset_not_found');
   expect((resolved as any).details.datasetId).toBe('ds_missing');
@@ -304,7 +393,7 @@ test('resolveUiComponentV1 resolves BarChart dataRef from sharedState.ui.dataset
     },
   });
 
-  const resolved = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_chart' });
+  const resolved = resolveUiComponentV1({ state: kernel.getState(), host: createHost({ registry }), componentId: 'cmp_chart' });
   expect(resolved.status).toBe('ok');
   expect((resolved as any).props.items).toEqual([
     { label: 'Search', value: 10 },

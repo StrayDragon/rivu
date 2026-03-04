@@ -5,6 +5,10 @@ Rivu is designed for **progressive adoption**. You can stop at any level.
 For the canonical "first integration" baseline (SSE/WS envelopes, `resumeFrom`, and rendering mounts from `sharedState.ui`), start with:
 - `docs/integration-quickstart.md`
 
+For runnable, categorized UI examples (Viewer/Workflow/datasets/charts/export/compaction), see:
+- `docs/examples.md` (overview)
+- `examples/rivu-react-demo` (interactive gallery)
+
 ## Adoption Ladder
 
 ### Level 0 — Spec only
@@ -12,7 +16,7 @@ For the canonical "first integration" baseline (SSE/WS envelopes, `resumeFrom`, 
 Use `rivu-ui-spec` to validate:
 
 - `CUSTOM(name="ui.v1.event")`
-- `sharedState.ui` (`state.ui` in PRD)
+- `sharedState.ui`
 - golden vectors for cross-language consistency
 
 ### Level 1 — Kernel only (no UI components)
@@ -28,7 +32,7 @@ Use `rivu-ui-spec` to validate:
 
 Use:
 
-- `ComponentRenderer` + registry (`rivu-react`)
+- `ComponentRenderer` + host config (`rivu-react`)
 - Svelte store + resolver primitives (`rivu-svelte`)
 - Viewer/Workflow MVP components (exported by `rivu-react`)
 
@@ -76,17 +80,41 @@ const mounted = selectMountedUiComponentsV1({
 });
 ```
 
-## React: registry + `ComponentRenderer`
+## React: host + `ComponentRenderer`
 
-### Registry
+### Registry + host
 
 ```ts
-import { createRegistry, viewerRegistryV1, workflowRegistryV1 } from 'rivu-react';
+import { createHost, createRegistry, viewerRegistryV1, workflowRegistryV1 } from 'rivu-react';
 
 const registry = createRegistry({
   ...viewerRegistryV1,
   ...workflowRegistryV1,
   // plus app components…
+});
+const host = createHost({ registry });
+```
+
+Optional host configuration:
+
+- `renderHooks`: value formatting, URL sanitization, optional markdown/highlight, optional props sanitization (host-only, pre-render)
+- `slotProps`: inject `className/style/attrs` into default sub-areas (without replacing slots)
+
+```ts
+import { defaultRenderHooks } from 'rivu-react';
+
+const host = createHost({
+  registry,
+  renderHooks: {
+    // Example: allow https only
+    sanitizeUrl: (rawUrl) => {
+      const url = defaultRenderHooks.sanitizeUrl(rawUrl);
+      return url?.startsWith('https:') ? url : null;
+    },
+  },
+  slotProps: {
+    DataTable: { td: { className: 'tabular-nums' } },
+  },
 });
 ```
 
@@ -113,7 +141,7 @@ const capabilitiesEvent = {
   type: 'CUSTOM',
   name: 'ui.v1.capabilities',
   value: {
-    ...buildUiV1Capabilities(registry, {
+    ...buildUiV1Capabilities(host, {
       // optional overrides/extensions
       export: { formats: ['json'] },
     }),
@@ -144,7 +172,7 @@ Missing / stale capabilities:
 ```tsx
 import { ComponentRenderer } from 'rivu-react';
 
-<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_123" />
+<ComponentRenderer kernel={kernel} host={host} componentId="cmp_123" />
 ```
 
 Provider is optional (sugar only): `RivuProvider`.
@@ -153,8 +181,8 @@ Provider is optional (sugar only): `RivuProvider`.
 
 Use `kernelStore(kernel)` to get `Readable<RivuKernelState>`, then either:
 
-- `resolveUiComponentV1({ state: $kernel, registry, componentId })`
-- or `componentRendererStore({ kernel, registry, componentId })` for a derived readable result
+- `resolveUiComponentV1({ state: $kernel, host, componentId })`
+- or `componentRendererStore({ kernel, host, componentId })` for a derived readable result
 
 ## Component lifecycle (building / ready / error)
 

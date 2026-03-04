@@ -1,7 +1,7 @@
 # ui-v1-capabilities Specification
 
 ## Purpose
-TBD - created by archiving change component-capabilities-handshake-v1. Update Purpose after archive.
+Define the `CUSTOM(name="ui.v1.capabilities")` handshake so clients can advertise supported component versions/features and servers can choose or downgrade UI outputs (capabilities are hints, not a security boundary).
 ## Requirements
 ### Requirement: 客户端通过 `CUSTOM(name="ui.v1.capabilities")` 上报能力
 系统 MUST 支持客户端→服务端发送一个 AG-UI `CUSTOM` 事件，且：
@@ -47,4 +47,3 @@ TBD - created by archiving change component-capabilities-handshake-v1. Update Pu
 #### Scenario: Features drives server-side downgrade choices
 - **WHEN** `features.datasets = false`
 - **THEN** 服务端在输出 `DataTable/Chart` 数据时采用更保守的兼容路径（例如内联数据而不是 `dataRef`）
-

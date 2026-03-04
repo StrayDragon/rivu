@@ -102,7 +102,12 @@ export function ProtocolInspector(props: ProtocolInspectorProps) {
   }));
 
   return (
-    <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', fontSize: 12 }}>
+    <div
+      style={{
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+        fontSize: 'var(--rivu-font-size-sm, 12px)',
+      }}
+    >
       <div style={{ fontWeight: 750, marginBottom: 6 }}>ProtocolInspector</div>
       <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{JSON.stringify(info, null, 2)}</pre>
     </div>

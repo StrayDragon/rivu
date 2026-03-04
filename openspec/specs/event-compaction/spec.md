@@ -1,7 +1,7 @@
 # event-compaction Specification
 
 ## Purpose
-TBD - created by archiving change event-compaction-v1. Update Purpose after archive.
+Define semantic-preserving event stream compaction/flush rules to reduce storage/replay cost while keeping reducer results equivalent (including chunk-merge and snapshot insertion strategies).
 ## Requirements
 ### Requirement: Compaction 后回放归约结果语义等价
 系统 MUST 支持对事件流执行 compaction：将一段高频小事件合并为更少的事件（或快照），用于降低写放大与 replay 成本。
@@ -41,4 +41,3 @@ compactor MUST 支持对常见写放大来源进行合并，至少包括：
 #### Scenario: Patch 链超过预算时生成快照
 - **WHEN** 自上次快照后累计的 `STATE_DELTA` 数量超过配置预算
 - **THEN** compactor 生成新的 `STATE_SNAPSHOT` 并允许丢弃更早的部分增量事件
-

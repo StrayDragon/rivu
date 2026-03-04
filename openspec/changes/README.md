@@ -1,53 +1,31 @@
-# OpenSpec Changes（推荐顺序）
+# OpenSpec Changes
 
-本目录包含各个变更（change）的 proposal / design / specs / tasks 工件。
+本目录包含各个变更（change）的 proposal / design / specs / tasks 工件：
+- `openspec/specs/*` 是权威 requirements（长期稳定）。
+- `openspec/changes/*` 是可执行的变更（规划/设计/任务），准备实现时使用 `/opsx:apply`。
+- 已完成的变更会被归档到 `openspec/changes/archive/*`（历史记录）。
 
-## 推荐实现顺序
+## PRD 迁移索引
 
-1) `integration-ergonomics-v1`
-   - 先把集成 DX 打底：统一 docs/examples 的事件写法、明确 `sharedState.ui` 口径、提供 `ProtocolInspector`、并补齐 server SDK patch helpers。
-   - 在扩大 UI surface area 之前先降低集成踩坑率。
+Legacy PRD（`PRD.md`）退役前后的章节映射与入口索引见：
 
-2) `security-limits-policy-v1`
-   - 把所有不可信输入（`ui.v1.event` / `sharedState.ui` / JSON Patch / datasets / A2UI）用统一 limits/policy 框住，避免 UI 爆炸与 DoS。
-   - 建议在引入更大 surface area（A2UI/datasets/export/交互）之前先落地。
+- `openspec/changes/prd-mapping.md`
 
-3) `ui-theme-tokens-slots`
-   - 让 UI kit 真正“像水”：theme tokens（CSS variables + fallback）、`className/style` 覆盖、复杂组件 slots/render hooks。
-   - 为图表与导出提供一致的视觉基础（palette/border/grid/typography）。
+## Active changes（待实现 / 进行中）
 
-4) `ui-component-lifecycle-v1`
-   - 标准化组件生命周期（`building|ready|error`）与 skeleton/error 渲染分支，提升流式生成 UI 的直觉与可调试性。
+- `kernel-outbox-retry-v1` — kernel outbox 支持 failed 条目的安全重试（依赖 server 端 `clientRequestId` 幂等）。
+- `ui-thread-toolkit-v1` — 可选 Thread UI Kit（Layer 2）+ ToolCards primitives（Layer 1.5）。
+- `workflow-cards-confirm-task-status-v1` — `ConfirmCard` + `TaskStatusCard`（workflow 常见 P0 交互补齐）。
+- `viewer-pivottable-heatmap-v1` — Viewer P1：`PivotTable` + `Heatmap`（datasets + export-friendly）。
+- `viewer-diff-view-v1` — Viewer P1：`DiffView`（before/after 差异展示，确定性导出）。
+- `workflow-multi-step-wizard-v1` — Workflow P1：`MultiStepWizard`（多步骤、强 revision 语义）+ server SDK processor。
+- `workflow-file-upload-card-v1` — Workflow P1：`FileUploadCard`（file refs + out-of-band upload 边界）+ server SDK processor。
+- `retire-prd-md` — 文档治理：PRD → OpenSpec 迁移、入口更新与 PRD 移除。
 
-5) `ui-datasets-v1`
-   - 引入 `sharedState.ui.datasets` + `dataRef` 引用，减少 DataTable/Chart 等组件重复数据与 patch/token 体积。
-
-6) `a2ui-viz-chart-v1`
-   - 增加通用 Viewer `Chart` 组件 + 省 token 的图表描述 + D3 驱动的专业渲染。
-   - 可与 `ui-datasets-v1` 协同：Chart/DataTable 共享同一数据集。
-
-7) `a2ui-bridge-v1`
-   - 定义紧凑的 `a2ui.v1`（面向 LLM 输出）并在服务端编译为 `STATE_DELTA`（RFC6902 patch）更新 `sharedState.ui`。
-   - 把“UI 长什么样”从回放真值 `sharedState.ui` 中抽离为更省 token 的生成输入。
-
-8) `component-capabilities-handshake-v1`
-   - 客户端上报“支持哪些组件/版本/特性”，服务端据此选择/降级输出，减少 UnknownComponent 并提升兼容性。
-
-9) `viewer-export-html-svg-pdf`
-   - Viewer 导出能力：在 structured JSON snapshot 基础上，扩展 HTML/SVG/PDF 导出路径（图表优先 SVG）。
-
-10) `event-compaction-v1`
-   - server-side flush/compaction：把高频小事件合并，降低写放大与 replay 成本；与快照策略协同。
-
-11) `chart-interactions-v1`
-   - 在保持 viewer Chart 不受影响的前提下，为 workflow 引入最小图表交互闭环（select/clear → `ui.v1.event` → server patch → 高亮回放）。
-
-## 如何开始实现某个 change
-
-运行：
+## How to apply
 
 - `/opsx:apply <change-name>`
 
 示例：
 
-- `/opsx:apply integration-ergonomics-v1`
+- `/opsx:apply ui-render-hooks-slotprops-v1`

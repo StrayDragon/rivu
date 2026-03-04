@@ -20,13 +20,17 @@ export function ComponentSkeleton(props: ComponentSkeletonProps) {
       style={{
         border: '1px solid var(--rivu-border, #e5e7eb)',
         borderRadius: 'var(--rivu-radius, 14px)',
-        padding: 14,
+        padding: 'var(--rivu-space-4, 14px)',
         background: 'var(--rivu-bg, #fff)',
         boxShadow: 'var(--rivu-shadow, none)',
         ...props.style,
       }}
     >
-      {props.title ? <div style={{ fontSize: 12, fontWeight: 650, color: 'var(--rivu-fg-muted, #374151)' }}>{props.title}</div> : null}
+      {props.title ? (
+        <div style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', fontWeight: 650, color: 'var(--rivu-fg-muted, #374151)' }}>
+          {props.title}
+        </div>
+      ) : null}
       <div style={{ marginTop: props.title ? 10 : 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ ...lineStyle, width: '55%' }} />
         <div style={{ ...lineStyle, width: '85%' }} />
@@ -35,4 +39,3 @@ export function ComponentSkeleton(props: ComponentSkeletonProps) {
     </div>
   );
 }
-

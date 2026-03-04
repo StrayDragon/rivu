@@ -4,7 +4,10 @@ import { expect, test, vi } from 'vitest';
 
 import { createKernel } from 'rivu-kernel';
 
-import { ComponentRenderer, createRegistry, viewerRegistryV1, workflowRegistryV1 } from '../src/index.js';
+import { ComponentRenderer, createHost, createRegistry, viewerRegistryV1, workflowRegistryV1 } from '../src/index.js';
+
+const viewerHost = createHost({ registry: createRegistry(viewerRegistryV1) });
+const workflowHost = createHost({ registry: createRegistry(workflowRegistryV1) });
 
 test('Viewer component props validate and render (MetricCard)', () => {
   const kernel = createKernel();
@@ -32,13 +35,47 @@ test('Viewer component props validate and render (MetricCard)', () => {
   render(
     <ComponentRenderer
       kernel={kernel}
-      registry={createRegistry(viewerRegistryV1)}
+      host={viewerHost}
       componentId="cmp_metric"
     />,
   );
 
   expect(screen.getByText('Revenue')).toBeTruthy();
   expect(screen.getByText(/1[, ]?234/)).toBeTruthy();
+});
+
+test('MetricCard uses host formatNumber hook', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_metric: {
+              type: 'MetricCard',
+              schemaVersion: 1,
+              props: { label: 'Revenue', value: 1234, unit: 'USD' },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const host = createHost({
+    registry: createRegistry(viewerRegistryV1),
+    renderHooks: {
+      formatNumber: () => 'formatted',
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} host={host} componentId="cmp_metric" />);
+  expect(screen.getByText('formatted')).toBeTruthy();
 });
 
 test('Viewer component props validate and render (Chart empty state)', () => {
@@ -69,7 +106,7 @@ test('Viewer component props validate and render (Chart empty state)', () => {
     },
   });
 
-  render(<ComponentRenderer kernel={kernel} registry={createRegistry(viewerRegistryV1)} componentId="cmp_chart" />);
+  render(<ComponentRenderer kernel={kernel} host={viewerHost} componentId="cmp_chart" />);
 
   expect(screen.getByText('Chart (empty)')).toBeTruthy();
   expect(screen.getByText('No data')).toBeTruthy();
@@ -102,7 +139,7 @@ test('Viewer component degrades to UnknownComponentCard on invalid Chart props',
     },
   });
 
-  render(<ComponentRenderer kernel={kernel} registry={createRegistry(viewerRegistryV1)} componentId="cmp_chart" />);
+  render(<ComponentRenderer kernel={kernel} host={viewerHost} componentId="cmp_chart" />);
   expect(screen.getByText('Invalid component props')).toBeTruthy();
 });
 
@@ -140,7 +177,7 @@ test('Chart emits ui.v1.event chart.setSelection with baseRevision', async () =>
     },
   });
 
-  render(<ComponentRenderer kernel={kernel} registry={createRegistry(viewerRegistryV1)} componentId="cmp_chart" />);
+  render(<ComponentRenderer kernel={kernel} host={viewerHost} componentId="cmp_chart" />);
 
   const bar = document.querySelector('svg rect[tabindex="0"]') as SVGRectElement | null;
   expect(bar).toBeTruthy();
@@ -194,7 +231,7 @@ test('ApprovalCard emits ui.v1.event approve with baseRevision', async () => {
   render(
     <ComponentRenderer
       kernel={kernel}
-      registry={createRegistry(workflowRegistryV1)}
+      host={workflowHost}
       componentId="cmp_approval"
     />,
   );
@@ -249,7 +286,7 @@ test('FormCard emits ui.v1.event setField and submit', async () => {
   render(
     <ComponentRenderer
       kernel={kernel}
-      registry={createRegistry(workflowRegistryV1)}
+      host={workflowHost}
       componentId="cmp_form"
     />,
   );

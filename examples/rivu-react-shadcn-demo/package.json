@@ -1,0 +1,35 @@
+{
+  "name": "rivu-react-shadcn-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:deps": "pnpm -C ../.. --filter rivu-ui-spec --filter rivu-kernel --filter rivu-react build",
+    "dev": "pnpm run build:deps && vite dev",
+    "build": "pnpm run build:deps && vite build",
+    "preview": "vite preview",
+    "typecheck": "pnpm run build:deps && tsc -p tsconfig.json --noEmit",
+    "test": "echo \"(no tests)\""
+  },
+  "dependencies": {
+    "@radix-ui/react-slot": "^1.0.2",
+    "@radix-ui/react-switch": "^1.0.3",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "rivu-kernel": "workspace:*",
+    "rivu-react": "workspace:*",
+    "rivu-ui-spec": "workspace:*",
+    "tailwind-merge": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.8",
+    "@vitejs/plugin-react": "^5.1.4",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}

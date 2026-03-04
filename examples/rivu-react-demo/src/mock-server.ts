@@ -32,6 +32,7 @@ export type MockServer = {
   bootstrap: () => void;
   actionTransport: (action: UiV1CustomEvent) => Promise<void>;
   capabilitiesTransport: (capabilities: UiV1CapabilitiesCustomEvent) => Promise<void>;
+  setDatasetRows: (datasetId: string, rows: Array<Array<string | number | null>>) => void;
   getSharedState: () => Record<string, unknown>;
 };
 
@@ -252,10 +253,27 @@ export function createMockServer(params: {
     console.log('[mock-server] received ui.v1.capabilities', capabilities.value);
   };
 
+  const setDatasetRows = (datasetId: string, rows: Array<Array<string | number | null>>) => {
+    const uiRaw = (sharedState as any).ui as unknown;
+    assertRecord(uiRaw, 'shared_state.ui is missing');
+
+    const datasetsRaw = (uiRaw as any).datasets as unknown;
+    assertRecord(datasetsRaw, 'shared_state.ui.datasets is missing');
+
+    const dataset = (datasetsRaw as any)[datasetId] as any;
+    if (!dataset) throw new Error(`dataset not found: ${datasetId}`);
+
+    dataset.rows = rows;
+
+    const ptr = encodePointer(datasetId);
+    emit({ type: 'STATE_DELTA', delta: [{ op: 'replace', path: `/ui/datasets/${ptr}/rows`, value: rows }] });
+  };
+
   return {
     bootstrap,
     actionTransport,
     capabilitiesTransport,
+    setDatasetRows,
     getSharedState: () => sharedState,
   };
 }

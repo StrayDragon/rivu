@@ -27,16 +27,22 @@ If a Provider is offered, it MUST be optional sugar and MUST NOT be required by 
 - **THEN** it receives updates after each applied envelope
 
 ### Requirement: Adapters provide a registry and a component renderer primitive
+
 Both adapters MUST provide a registry mechanism mapping `componentType` to renderer implementations.
 
 Adapters MUST provide a `ComponentRenderer` primitive that can:
 - lookup `componentId` in `state.ui`
 - validate component props/state using registered schemas
+- apply host-provided rendering configuration (e.g. render hooks and slotProps) in the rendering pipeline
 - render a known component, or fall back to an `UnknownComponent` renderer
 
 #### Scenario: Unknown component degrades without crashing
 - **WHEN** a component type is not registered or schema validation fails
 - **THEN** the UI renders an UnknownComponent fallback and the page remains functional
+
+#### Scenario: Host render hooks are available during render
+- **WHEN** a host provides a render hooks configuration to the adapter’s rendering pipeline
+- **THEN** a registered component renderer can consume those hooks (e.g. formatter/sanitizer) without reading them from `sharedState.ui`
 
 ### Requirement: TS packages are ESM-first and tree-shakable
 All TypeScript packages produced by Rivu MUST be ESM-first and SHOULD support Vite tree-shaking.
@@ -90,7 +96,8 @@ Adapters 的 `ComponentRenderer` MUST 根据 `sharedState.ui.components[componen
 - **THEN** `ComponentRenderer` 渲染 skeleton 分支，并保持页面可用
 
 ### Requirement: Adapters 提供 registry → capabilities 的生成函数
-`rivu-react` 与 `rivu-svelte` MUST 提供一个工具函数，用于从当前 registry 生成 `ui.v1.capabilities` payload（`value` 部分）。
+
+`rivu-react` 与 `rivu-svelte` MUST 提供一个工具函数，用于从当前 registry（以及必要的宿主配置）生成 `ui.v1.capabilities` payload（`value` 部分）。
 
 该工具函数 MUST：
 - 覆盖 registry 中已注册的所有 `componentType`
@@ -99,7 +106,7 @@ Adapters 的 `ComponentRenderer` MUST 根据 `sharedState.ui.components[componen
   - `datasets: boolean`
   - `lifecycle: boolean`
   - 当 `Chart` 已注册时，包含 `chart.marks: string[]` 与 `chart.interactions: string[]`（不支持时可为空数组）
-- 允许宿主覆盖/扩展 `features`（例如补齐 marks/interactions、或声明导出 formats）
+- 允许宿主覆盖/扩展 `features`
 
 #### Scenario: Capabilities reflects registered components
 - **WHEN** registry 注册了 `DataTable`（schemaVersion=1）与 `Chart`（schemaVersion=1）

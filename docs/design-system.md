@@ -67,9 +67,46 @@ import 'rivu-react/tokens.css';
 }
 ```
 
-## 2) Slots / Render hooks（复杂组件）
+## 2) Slots / SlotProps / Render hooks（复杂组件）
 
-### DataTable：cell / empty state slots
+### SlotProps：inject without replace（推荐）
+
+当你只想“在默认子区域上注入 className/style/attrs”，而不想替换整个子渲染时，使用 `slotProps`：
+
+```ts
+import { createHost, createRegistry, viewerRegistryV1, workflowRegistryV1 } from 'rivu-react';
+
+const registry = createRegistry({ ...viewerRegistryV1, ...workflowRegistryV1 });
+
+const host = createHost({
+  registry,
+  slotProps: {
+    DataTable: {
+      table: { className: 'text-sm' },
+      th: { className: 'uppercase tracking-wide' },
+      td: { className: 'tabular-nums' },
+      emptyState: { className: 'text-muted-foreground' },
+    },
+    ApprovalCard: {
+      actions: { className: 'justify-end' },
+      approveButton: { className: 'shadow-sm' },
+      denyButton: { className: 'shadow-sm' },
+    },
+    FormCard: {
+      fields: { className: 'gap-4' },
+      submitButton: { className: 'w-full' },
+    },
+  },
+});
+```
+
+它的目标是：
+- **保留默认渲染行为**（不影响 server-authoritative props/state）
+- 在宿主侧统一注入：`className`、`style`、`data-*`、`aria-*` 等
+
+当你需要彻底替换子渲染（自定义 DOM/组件结构）时，再使用 `slots`（下一节）。
+
+### DataTable：cell / empty state slots（full replace）
 
 `DataTable` 支持 `slots.Cell` 与 `slots.EmptyState`，用于宿主自定义渲染（例如数值格式化、空态替换），并且**不需要修改** server-owned `props/rows`。
 
@@ -106,7 +143,7 @@ const registry = createRegistry({
 });
 ```
 
-### Workflow cards：actions / status slots
+### Workflow cards：actions / status slots（full replace）
 
 `ApprovalCard` 与 `FormCard` 提供最小的 `slots` 入口，用于替换 actions/status 区域的子渲染，同时保持 server-authoritative 行为不变（仍然发出 `ui.v1.event`）。
 
@@ -146,6 +183,45 @@ const registry = createRegistry({
 });
 ```
 
+### Render hooks：formatter / URL sanitizer / markdown / highlight / props sanitizer
+
+Render hooks 用于“数据级扩展点”：宿主可以在不修改 `sharedState.ui` 的前提下，统一注入格式化、安全策略与富文本渲染。
+
+```ts
+import { createHost, createRegistry, defaultRenderHooks, viewerRegistryV1, workflowRegistryV1 } from 'rivu-react';
+
+const registry = createRegistry({ ...viewerRegistryV1, ...workflowRegistryV1 });
+
+const host = createHost({
+  registry,
+  renderHooks: {
+    // 1) value formatting（示例：固定 en-US + 货币）
+    formatNumber: (value) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value),
+    formatCurrency: (value, meta) => new Intl.NumberFormat('en-US', { style: 'currency', currency: meta.currency }).format(value),
+
+    // 2) URL sanitizer（默认策略：仅允许 http(s)/mailto；其余返回 null 并在组件中被阻止）
+    sanitizeUrl: (rawUrl) => {
+      const url = defaultRenderHooks.sanitizeUrl(rawUrl);
+      // 例：只允许 https
+      return url?.startsWith('https:') ? url : null;
+    },
+
+    // 3) markdown/highlight（可选）
+    // 注意：若你返回 HTML，必须在宿主侧自行 sanitize（否则可能 XSS）。
+    renderMarkdown: (markdown) => markdown,
+    highlightCode: (code) => code,
+
+    // 4) component props sanitizer（可选，pre-render，host-only，不写入协议）
+    sanitizeComponentProps: (meta, props) => {
+      // 例：统一去掉危险字段（按 componentType/路径裁剪）
+      return props;
+    },
+  },
+});
+```
+
+> 安全注意：`renderMarkdown/highlightCode` 的默认实现是“纯文本/不高亮”，确保不会注入 HTML。宿主若自行渲染 markdown → HTML，**必须自己做 HTML sanitization**。
+
 ## 3) Svelte 说明
 
 Rivu 的 tokens 是纯 CSS variables，因此跨框架一致。  
@@ -153,3 +229,85 @@ Svelte 侧的 slots 形式可以 idiomatic（原生 `<slot>` / props），但语
 - DataTable：支持 cell 渲染与 empty state 替换
 - Workflow cards：支持 actions/status 区域替换
 
+## 4) 融入流行 UI 库（Material UI / shadcn 风格）
+
+Rivu 的官方 UI kit 只依赖 `--rivu-*` CSS variables，因此你可以把它映射到任意宿主 UI 库的主题系统，让“外壳 UI”与 Rivu 内部卡片保持一致。
+
+### Material UI（MUI）映射示例
+
+推荐做法是在你的 App 根节点（或嵌入容器）上设置一组 `--rivu-*` 变量，值来自 MUI theme：
+
+```tsx
+import { ThemeProvider, createTheme, useTheme } from '@mui/material/styles';
+
+function RivuTokenBridge({ children }: { children: React.ReactNode }) {
+  const theme = useTheme();
+  return (
+    <div
+      style={{
+        ['--rivu-bg' as any]: theme.palette.background.paper,
+        ['--rivu-bg-muted' as any]: theme.palette.action.hover,
+        ['--rivu-fg' as any]: theme.palette.text.primary,
+        ['--rivu-fg-muted' as any]: theme.palette.text.secondary,
+        ['--rivu-muted' as any]: theme.palette.text.secondary,
+        ['--rivu-font-family' as any]: theme.typography.fontFamily,
+        ['--rivu-font-size-sm' as any]: theme.typography.caption.fontSize,
+        ['--rivu-font-size-base' as any]: theme.typography.body1.fontSize,
+        ['--rivu-space-2' as any]: theme.spacing(1),
+        ['--rivu-space-3' as any]: theme.spacing(1.5),
+        ['--rivu-space-4' as any]: theme.spacing(1.75),
+        ['--rivu-border' as any]: theme.palette.divider,
+        ['--rivu-border-muted' as any]: theme.palette.divider,
+        ['--rivu-shadow' as any]: theme.shadows[1],
+        ['--rivu-radius' as any]: `${theme.shape.borderRadius + 6}px`,
+        ['--rivu-radius-sm' as any]: `${theme.shape.borderRadius}px`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+const muiTheme = createTheme({ palette: { mode: 'light' } });
+
+export function App() {
+  return (
+    <ThemeProvider theme={muiTheme}>
+      <RivuTokenBridge>{/* mount your Rivu renderer here */}</RivuTokenBridge>
+    </ThemeProvider>
+  );
+}
+```
+
+> 提示：图表 palette（`--rivu-chart-*`）也可以从 MUI 的品牌色派生，或直接绑定到你的 design system chart tokens。
+
+### shadcn 风格（Tailwind CSS variables）映射示例
+
+shadcn 常用的主题变量是 `--background/--foreground/--muted/--border` 等。你可以把它们转接到 `--rivu-*`：
+
+```css
+:root {
+  --rivu-bg: hsl(var(--background));
+  --rivu-bg-muted: hsl(var(--muted));
+  --rivu-bg-subtle: hsl(var(--muted) / 0.7);
+  --rivu-fg: hsl(var(--foreground));
+  --rivu-fg-muted: hsl(var(--muted-foreground));
+  --rivu-muted: hsl(var(--muted-foreground));
+  --rivu-font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  --rivu-font-size-sm: 0.75rem; /* 12px */
+  --rivu-font-size-base: 0.875rem; /* 14px */
+  --rivu-space-2: 0.5rem; /* 8px */
+  --rivu-space-3: 0.75rem; /* 12px */
+  --rivu-space-4: 0.875rem; /* 14px */
+  --rivu-border: hsl(var(--border));
+  --rivu-border-muted: hsl(var(--border));
+  --rivu-radius: 14px;
+  --rivu-radius-sm: 10px;
+}
+
+.dark {
+  /* shadcn 的 .dark 会切换这些变量，rivu 会自动跟随 */
+}
+```
+
+这样 Rivu 组件就会自然融入你已有的 Card / Button / Typography 风格里（尤其是边框、背景、圆角、暗色策略与图表配色）。

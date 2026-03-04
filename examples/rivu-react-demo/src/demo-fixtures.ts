@@ -128,6 +128,16 @@ export function createInitialSharedState() {
             details: { hint: 'Use viewer-safe error details only.' },
           },
         },
+        cmp_unknown_demo: {
+          type: 'NotRegistered',
+          schemaVersion: 1,
+          props: {
+            title: 'Unknown component (demo)',
+            note: 'This type is not in the client registry; it should render as a viewer-safe fallback.',
+          },
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'sidebar', order: 3 }],
+        },
         cmp_line_chart: {
           type: 'LineChart',
           schemaVersion: 1,
@@ -152,7 +162,7 @@ export function createInitialSharedState() {
             title: 'CitationList (sidebar)',
             items: [
               { title: 'AG-UI Protocol', url: 'https://github.com/ag-ui-protocol/ag-ui', snippet: 'Wire format reference (demo link).' },
-              { title: 'Rivu PRD.md', url: 'https://example.invalid', snippet: 'Invalid URL should be blocked (demo).' },
+              { title: 'Rivu OpenSpec', url: 'https://example.invalid', snippet: 'Invalid URL should be blocked (demo).' },
             ],
           },
           revision: 0,

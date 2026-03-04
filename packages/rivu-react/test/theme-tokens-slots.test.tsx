@@ -9,8 +9,10 @@ import {
   ApprovalCard,
   ComponentRenderer,
   DataTable,
+  FormCard,
   MetricCard,
   approvalCardRegistrationV1,
+  createHost,
   createRegistry,
   workflowRegistryV1,
 } from '../src/index.js';
@@ -101,7 +103,7 @@ test('ApprovalCard Actions slot can trigger approve', async () => {
     },
   });
 
-  render(<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_approval" />);
+  render(<ComponentRenderer kernel={kernel} host={createHost({ registry })} componentId="cmp_approval" />);
 
   await act(async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Custom approve' }));
@@ -111,4 +113,64 @@ test('ApprovalCard Actions slot can trigger approve', async () => {
   expect(actions[0].type).toBe('CUSTOM');
   expect(actions[0].name).toBe('ui.v1.event');
   expect(actions[0].value.eventName).toBe('approve');
+});
+
+test('DataTable slotProps inject into default cells', () => {
+  const host = createHost({
+    registry: createRegistry({}),
+    slotProps: {
+      DataTable: {
+        td: { className: 'host-td', 'data-td': '1' },
+      },
+    },
+  });
+
+  render(<DataTable host={host} columns={[{ key: 'name', label: 'Name' }]} rows={[{ name: 'Acme' }]} />);
+  const td = screen.getByText('Acme').closest('td') as HTMLElement | null;
+  expect(td).toBeTruthy();
+  expect(td!.className).toContain('host-td');
+  expect(td!.getAttribute('data-td')).toBe('1');
+});
+
+test('ApprovalCard slotProps inject into buttons', () => {
+  const kernel = createKernel({ actionTransport: vi.fn(async () => {}) });
+  const host = createHost({
+    registry: createRegistry({}),
+    slotProps: {
+      ApprovalCard: {
+        approveButton: { className: 'approve-btn' },
+        denyButton: { className: 'deny-btn' },
+      },
+    },
+  });
+
+  render(<ApprovalCard host={host} kernel={kernel} componentId="cmp_approval" revision={0} state={{ status: 'pending' }} title="Approve?" />);
+  expect(screen.getByRole('button', { name: 'Approve' }).className).toContain('approve-btn');
+  expect(screen.getByRole('button', { name: 'Deny' }).className).toContain('deny-btn');
+});
+
+test('FormCard slotProps inject into submit button', () => {
+  const kernel = createKernel({ actionTransport: vi.fn(async () => {}) });
+  const host = createHost({
+    registry: createRegistry({}),
+    slotProps: {
+      FormCard: {
+        submitButton: { className: 'submit-btn' },
+      },
+    },
+  });
+
+  render(
+    <FormCard
+      host={host}
+      kernel={kernel}
+      componentId="cmp_form"
+      revision={0}
+      state={{ values: {}, status: 'idle' }}
+      title="Form"
+      fields={[{ id: 'name', label: 'Name', type: 'text' }]}
+    />,
+  );
+
+  expect(screen.getByRole('button', { name: 'Submit' }).className).toContain('submit-btn');
 });

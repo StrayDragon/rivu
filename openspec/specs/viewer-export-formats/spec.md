@@ -1,7 +1,7 @@
 # viewer-export-formats Specification
 
 ## Purpose
-TBD - created by archiving change viewer-export-html-svg-pdf. Update Purpose after archive.
+Define the Viewer export contract: a deterministic, offline pipeline that consumes structured `rivu.export.v1` JSON snapshots and produces HTML/SVG (and optionally PDF) outputs with graceful degradation for unknown components.
 ## Requirements
 ### Requirement: Export inputs are structured JSON snapshots (v1)
 Viewer 导出 MUST 以结构化 JSON snapshot 作为输入真值。
@@ -48,4 +48,3 @@ HTML 导出结果 SHOULD 是一份可独立打开的完整 HTML 文档（包含 
 #### Scenario: Optional PDF export
 - **WHEN** 宿主环境提供 headless browser 渲染能力（例如 Playwright）
 - **THEN** 系统可从同一 HTML 导出结果派生 PDF
-

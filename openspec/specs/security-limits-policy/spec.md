@@ -1,7 +1,7 @@
 # security-limits-policy Specification
 
 ## Purpose
-TBD - created by archiving change security-limits-policy-v1. Update Purpose after archive.
+Define cross-language input limits (`UiInputLimitsV1`) and default policies for validating and bounding untrusted UI-related inputs (`ui.v1.event`, `sharedState.ui`, JSON Patch, datasets, A2UI) to reduce risk (DoS, unsafe rendering) while keeping behavior consistent across TS/Python/Rust.
 ## Requirements
 ### Requirement: 统一的输入 limits 配置模型（v1）
 系统 MUST 定义一套跨语言一致的 limits 配置模型（下称 `UiInputLimitsV1`），用于约束所有不可信 JSON 输入的可接受边界。
@@ -74,4 +74,3 @@ TBD - created by archiving change security-limits-policy-v1. Update Purpose afte
 #### Scenario: 超限错误包含 limit 与阈值
 - **WHEN** 一个输入超过 `decode.maxBytes` 被拒绝
 - **THEN** 错误包含 `code="LIMIT_EXCEEDED"`、`limit="decode.maxBytes"`、以及对应的 `max/observed`
-

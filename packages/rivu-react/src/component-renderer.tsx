@@ -2,29 +2,30 @@ import type { RivuKernel } from 'rivu-kernel';
 import { selectUiComponentV1 } from 'rivu-kernel';
 
 import { useKernelState } from './use-kernel-state.js';
-import type { RivuComponentRegistry } from './registry.js';
 import { ComponentErrorCard } from './component-error-card.js';
 import { ComponentSkeleton } from './component-skeleton.js';
 import { UnknownComponentCard } from './unknown-component-card.js';
 import { useRivuContext } from './provider.js';
+import type { RivuHost } from './registry.js';
+import type { RivuComponentMeta } from './render-hooks.js';
 
 export type ComponentRendererProps = {
   componentId: string;
   kernel?: RivuKernel;
-  registry?: RivuComponentRegistry;
+  host?: RivuHost;
 };
 
-function useResolvedParams(props: ComponentRendererProps): { kernel: RivuKernel; registry: RivuComponentRegistry } {
-  if (props.kernel && props.registry) return { kernel: props.kernel, registry: props.registry };
+function useResolvedParams(props: ComponentRendererProps): { kernel: RivuKernel; host: RivuHost } {
+  if (props.kernel && props.host) return { kernel: props.kernel, host: props.host };
   const ctx = useRivuContext();
   return {
     kernel: props.kernel ?? ctx.kernel,
-    registry: props.registry ?? ctx.registry,
+    host: props.host ?? ctx.host,
   };
 }
 
 export function ComponentRenderer(props: ComponentRendererProps) {
-  const { kernel, registry } = useResolvedParams(props);
+  const { kernel, host } = useResolvedParams(props);
 
   const component = useKernelState(kernel, (state) => selectUiComponentV1(state, props.componentId));
 
@@ -32,7 +33,7 @@ export function ComponentRenderer(props: ComponentRendererProps) {
     return <UnknownComponentCard title="Component not found" componentId={props.componentId} details={{ componentId: props.componentId }} />;
   }
 
-  const registration = registry[component.type];
+  const registration = host.registry[component.type];
   if (!registration) {
     return (
       <UnknownComponentCard
@@ -94,6 +95,33 @@ export function ComponentRenderer(props: ComponentRendererProps) {
     );
   }
 
+  const meta: RivuComponentMeta = {
+    componentId: props.componentId,
+    componentType: component.type,
+    schemaVersion: component.schemaVersion,
+  };
+
+  let sanitizedProps = propsResult.data as any;
+  try {
+    if (host.renderHooks.sanitizeComponentProps) {
+      sanitizedProps = host.renderHooks.sanitizeComponentProps(meta, propsResult.data as any);
+    }
+  } catch (err) {
+    return (
+      <UnknownComponentCard
+        title="Component props blocked by host sanitizer"
+        componentId={props.componentId}
+        componentType={component.type}
+        schemaVersion={component.schemaVersion}
+        details={{
+          componentId: props.componentId,
+          componentType: component.type,
+          error: err instanceof Error ? err.message : String(err),
+        }}
+      />
+    );
+  }
+
   const stateResult = registration.stateSchema ? registration.stateSchema.safeParse(component.state ?? {}) : null;
   if (stateResult && !stateResult.success) {
     return (
@@ -113,11 +141,12 @@ export function ComponentRenderer(props: ComponentRendererProps) {
 
   return registration.render({
     kernel,
+    host,
     componentId: props.componentId,
     componentType: component.type,
     schemaVersion: component.schemaVersion,
     revision: component.revision,
-    props: propsResult.data,
+    props: sanitizedProps,
     state: stateResult ? stateResult.data : undefined,
   });
 }

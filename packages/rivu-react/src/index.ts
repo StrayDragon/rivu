@@ -1,7 +1,13 @@
 export const RIVU_REACT_VERSION = 1 as const;
 
-export type { RivuComponentRegistration, RivuComponentRegistry } from './registry.js';
-export { createRegistry } from './registry.js';
+export type { RivuComponentRegistration, RivuComponentRegistry, RivuHost } from './registry.js';
+export { createHost, createRegistry } from './registry.js';
+
+export type { RivuComponentMeta, RivuCodeMeta, RivuFormatMeta, RivuMarkdownMeta, RivuRenderHooks } from './render-hooks.js';
+export { defaultRenderHooks, mergeRenderHooks } from './render-hooks.js';
+
+export type { RivuSlotPropOverrides, RivuSlotProps } from './slot-props.js';
+export { applySlotProps } from './slot-props.js';
 
 export type { UseKernelStateSelector } from './use-kernel-state.js';
 export { useKernelState } from './use-kernel-state.js';

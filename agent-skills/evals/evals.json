@@ -1,0 +1,24 @@
+{
+  "skill_name": "rivu-agent-skills",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我有一个现成的 React 应用（SSE）。请把 Rivu 集成进去：SSE id/data -> {seq,event} -> kernel -> sharedState.ui mounts 渲染（inline/sidebar），并且支持 ui.v1.capabilities 与 ui.v1.event 的 workflow 回传闭环。",
+      "expected_output": "给出最小集成步骤 + 关键代码片段（kernel 初始化、SSE decode、registry + ComponentRenderer、capabilities 发送、服务端 ui.v1.event 处理器要点）。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "最近新增了 chart interactions 与 event compaction。请检查 examples 是否需要更新，并把 demo 做成分门别类的交互式 UI 展厅，同时补全 docs 的索引入口，最后跑 typecheck/build。",
+      "expected_output": "列出需要更新的文件 + 完成后的运行验证命令；examples 有可点击入口展示 interactions/compaction/export。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "我要让 LLM 输出 a2ui.v1，然后服务端编译成只修改 /ui/... 的 RFC6902 patch 并发 STATE_DELTA。请用 Python 给出最小闭环示例，并说明 limits 与 key map store 的必要性。",
+      "expected_output": "提供 Python 代码骨架：decode + limits + compile + patchOps -> STATE_DELTA；解释 key->componentId 的持久化策略。",
+      "files": []
+    }
+  ]
+}
+

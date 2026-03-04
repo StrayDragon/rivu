@@ -1,0 +1,31 @@
+{
+  "name": "rivu-react-mui-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:deps": "pnpm -C ../.. --filter rivu-ui-spec --filter rivu-kernel --filter rivu-react build",
+    "dev": "pnpm run build:deps && vite dev",
+    "build": "pnpm run build:deps && vite build",
+    "preview": "vite preview",
+    "typecheck": "pnpm run build:deps && tsc -p tsconfig.json --noEmit",
+    "test": "echo \"(no tests)\""
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.8",
+    "@mui/material": "^7.3.8",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "rivu-kernel": "workspace:*",
+    "rivu-react": "workspace:*",
+    "rivu-ui-spec": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.8",
+    "@vitejs/plugin-react": "^5.1.4",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}

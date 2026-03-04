@@ -17,11 +17,11 @@ export function UnknownComponentCard(props: UnknownComponentCardProps) {
       style={{
         border: '1px solid var(--rivu-border, #e5e7eb)',
         borderRadius: 'var(--rivu-radius, 12px)',
-        padding: 12,
+        padding: 'var(--rivu-space-3, 12px)',
         background: 'var(--rivu-bg-muted, #fafafa)',
         boxShadow: 'var(--rivu-shadow, none)',
-        fontFamily: 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial',
-        fontSize: 12,
+        fontFamily: 'var(--rivu-font-family, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial)',
+        fontSize: 'var(--rivu-font-size-sm, 12px)',
         color: 'var(--rivu-fg, #111827)',
         ...props.style,
       }}
