@@ -1,8 +1,9 @@
 use serde_json::json;
 
 use rivu_server_sdk::{
-    increment_component_revision_v1, mount_component_v1, reduce_envelopes_v1, set_component_props_v1,
-    set_component_state_v1, set_component_v1, unmount_component_v1, ReduceEnvelopeV1, UiMountV1,
+    data_ref_v1, delete_dataset_v1, increment_component_revision_v1, mount_component_v1, reduce_envelopes_v1,
+    set_component_props_v1, set_component_state_v1, set_component_v1, set_dataset_v1, unmount_component_v1,
+    ReduceEnvelopeV1, UiMountV1,
 };
 
 fn reduce_with_delta(shared_state: serde_json::Value, delta: Vec<serde_json::Value>) -> serde_json::Value {
@@ -121,4 +122,45 @@ fn set_component_props_state_and_revision() {
     assert_eq!(next["ui"]["components"]["cmp_1"]["props"]["title"], "Hello");
     assert_eq!(next["ui"]["components"]["cmp_1"]["state"]["status"], "pending");
     assert_eq!(next["ui"]["components"]["cmp_1"]["revision"], 11);
+}
+
+#[test]
+fn set_dataset_v1_adds_datasets_when_missing() {
+    let shared_state = json!({ "ui": { "v": 1, "components": {} } });
+    let dataset = json!({ "columns": ["label", "value"], "rows": [["Search", 10]] });
+
+    let delta = set_dataset_v1(&shared_state, "ds_1", dataset).expect("set_dataset_v1 ok");
+    let next = reduce_with_delta(shared_state, delta);
+    assert_eq!(next["ui"]["datasets"]["ds_1"]["columns"][0], "label");
+}
+
+#[test]
+fn set_dataset_v1_adds_dataset_when_datasets_exist() {
+    let shared_state = json!({
+        "ui": { "v": 1, "components": {}, "datasets": { "ds_old": { "columns": ["a"], "rows": [[1]] } } }
+    });
+    let dataset = json!({ "columns": ["label", "value"], "rows": [["Email", 5]] });
+
+    let delta = set_dataset_v1(&shared_state, "ds_1", dataset).expect("set_dataset_v1 ok");
+    let next = reduce_with_delta(shared_state, delta);
+    assert_eq!(next["ui"]["datasets"]["ds_old"]["columns"][0], "a");
+    assert_eq!(next["ui"]["datasets"]["ds_1"]["rows"][0][0], "Email");
+}
+
+#[test]
+fn delete_dataset_v1_removes_dataset_when_present() {
+    let shared_state = json!({
+        "ui": { "v": 1, "components": {}, "datasets": { "ds_1": { "columns": ["a"], "rows": [[1]] } } }
+    });
+
+    let delta = delete_dataset_v1(&shared_state, "ds_1").expect("delete_dataset_v1 ok");
+    let next = reduce_with_delta(shared_state, delta);
+    assert!(next["ui"]["datasets"].get("ds_1").is_none());
+}
+
+#[test]
+fn data_ref_v1_rejects_empty_dataset_id() {
+    let err = data_ref_v1("   ").unwrap_err();
+    let msg = format!("{err}");
+    assert!(msg.contains("dataRef.datasetId must be non-empty"));
 }

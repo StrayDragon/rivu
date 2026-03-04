@@ -10,6 +10,17 @@ export function createInitialSharedState() {
   return {
     ui: {
       v: 1,
+      datasets: {
+        ds_revenue_by_channel: {
+          columns: ['label', 'value'],
+          rows: [
+            ['Search', 34_200],
+            ['Referral', 21_100],
+            ['Direct', 17_800],
+            ['Email', 9_400],
+          ],
+        },
+      },
       components: {
         cmp_report_section: {
           type: 'ReportSection',
@@ -46,17 +57,13 @@ export function createInitialSharedState() {
           type: 'DataTable',
           schemaVersion: 1,
           props: {
-            caption: 'Top customers (demo)',
+            caption: 'Revenue by channel (dataset demo)',
+            dataRef: { datasetId: 'ds_revenue_by_channel' },
             columns: [
-              { key: 'name', label: 'Customer' },
-              { key: 'orders', label: 'Orders', align: 'right' },
-              { key: 'amount', label: 'Amount', align: 'right' },
+              { key: 'label', label: 'Channel' },
+              { key: 'value', label: 'Revenue', align: 'right' },
             ],
-            rows: [
-              { name: 'Acme Co', orders: 12, amount: 48_120 },
-              { name: 'Northwind', orders: 9, amount: 31_000 },
-              { name: 'Globex', orders: 7, amount: 21_450 },
-            ],
+            rows: [],
           },
           revision: 0,
           mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 3 }],
@@ -80,14 +87,10 @@ export function createInitialSharedState() {
           type: 'BarChart',
           schemaVersion: 1,
           props: {
-            title: 'BarChart',
+            title: 'BarChart (dataset demo)',
             unit: 'USD',
-            items: [
-              { label: 'Search', value: 34_200 },
-              { label: 'Referral', value: 21_100 },
-              { label: 'Direct', value: 17_800 },
-              { label: 'Email', value: 9_400 },
-            ],
+            dataRef: { datasetId: 'ds_revenue_by_channel' },
+            items: [],
           },
           revision: 0,
           mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 5 }],

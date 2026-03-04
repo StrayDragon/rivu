@@ -9,9 +9,9 @@ mod state_ui_patch;
 mod limits;
 
 pub use ui_spec::{
-    parse_ui_state_v1, parse_ui_v1_custom_event, reduce_envelopes_v1, DecodeLimits, ReduceEnvelopeV1,
-    ReduceGapV1, ReduceResultV1, UiComponentV1, UiMountV1, UiSpecError, UiStateV1, UiV1CustomEvent,
-    UiV1EventValue, UI_V1_EVENT_NAME,
+    parse_ui_data_ref_v1, parse_ui_dataset_v1, parse_ui_state_v1, parse_ui_v1_custom_event, reduce_envelopes_v1,
+    DecodeLimits, ReduceEnvelopeV1, ReduceGapV1, ReduceResultV1, UiComponentV1, UiDataRefV1, UiDatasetV1, UiMountV1,
+    UiSpecError, UiStateV1, UiV1CustomEvent, UiV1EventValue, UI_V1_EVENT_NAME,
 };
 
 pub use seq::{SeqAllocator, SeqError};
@@ -22,8 +22,8 @@ pub use resume::{resume_replay, ResumeError, ResumeKind, ResumeResult};
 pub use ui_v1_event_processor::{AuthorizeHook, ProcessedResult, UiV1EventProcessor, UiV1EventProcessorError};
 
 pub use state_ui_patch::{
-    increment_component_revision_v1, mount_component_v1, set_component_props_v1, set_component_state_v1, set_component_v1,
-    unmount_component_v1,
+    data_ref_v1, delete_dataset_v1, increment_component_revision_v1, mount_component_v1, set_component_props_v1,
+    set_component_state_v1, set_component_v1, set_dataset_v1, unmount_component_v1,
 };
 
 pub use limits::{

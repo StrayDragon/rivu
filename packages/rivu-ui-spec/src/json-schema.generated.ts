@@ -170,6 +170,39 @@ export const uiStateV1JsonSchema = {
               ],
               "additionalProperties": false
             }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "building",
+              "ready",
+              "error"
+            ]
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              },
+              "details": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": {}
           }
         },
         "required": [
@@ -181,6 +214,49 @@ export const uiStateV1JsonSchema = {
         ],
         "additionalProperties": {}
       }
+    },
+    "datasets": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "required": [
+          "columns",
+          "rows"
+        ],
+        "additionalProperties": {}
+      }
     }
   },
   "required": [
@@ -188,6 +264,60 @@ export const uiStateV1JsonSchema = {
     "components"
   ],
   "additionalProperties": {}
+} as const;
+
+export const uiDatasetV1JsonSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "columns": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "required": [
+    "columns",
+    "rows"
+  ],
+  "additionalProperties": {}
+} as const;
+
+export const uiDataRefV1JsonSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "datasetId": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "datasetId"
+  ],
+  "additionalProperties": false
 } as const;
 
 export const uiInputLimitsV1JsonSchema = {

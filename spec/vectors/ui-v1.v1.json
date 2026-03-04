@@ -196,6 +196,16 @@
             }
           }
         }
+      },
+      {
+        "v": 1,
+        "datasets": {
+          "ds_1": {
+            "columns": ["label", "value"],
+            "rows": [["Search", 34200]]
+          }
+        },
+        "components": {}
       }
     ],
     "invalid": [
@@ -331,8 +341,63 @@
             }
           }
         }
+      },
+      {
+        "v": 1,
+        "datasets": {
+          "": {
+            "columns": ["a"],
+            "rows": [[1]]
+          }
+        },
+        "components": {}
       }
     ]
+  },
+  "uiDatasetV1": {
+    "valid": [
+      {
+        "columns": ["label", "value"],
+        "rows": [
+          ["Search", 34200],
+          ["Referral", 21100],
+          ["Direct", 17800],
+          ["Email", 9400],
+          ["Other", null]
+        ]
+      },
+      {
+        "columns": ["x", "y"],
+        "rows": [
+          ["Mon", 210],
+          ["Tue", 190],
+          ["Wed", 240]
+        ],
+        "meta": { "note": "extra fields allowed" }
+      }
+    ],
+    "invalid": [
+      {
+        "columns": [],
+        "rows": []
+      },
+      {
+        "columns": ["a", "b"],
+        "rows": [[1]]
+      },
+      {
+        "columns": [""],
+        "rows": [[1]]
+      },
+      {
+        "columns": ["a"],
+        "rows": [[true]]
+      }
+    ]
+  },
+  "uiDataRefV1": {
+    "valid": [{ "datasetId": "ds_1" }],
+    "invalid": [{}, { "datasetId": "" }, { "datasetId": "   " }, { "datasetId": 123 }, { "datasetId": "ds_1", "extra": 1 }]
   },
   "limitsV1": {
     "uiEvent": [

@@ -1,9 +1,68 @@
 use serde_json::{json, Value};
 
-use crate::UiMountV1;
+use crate::{UiMountV1, UiSpecError};
 
 fn encode_pointer(token: &str) -> String {
     token.replace('~', "~0").replace('/', "~1")
+}
+
+pub fn data_ref_v1(dataset_id: &str) -> Result<Value, UiSpecError> {
+    if dataset_id.trim().is_empty() {
+        return Err(UiSpecError::ValidationError("dataRef.datasetId must be non-empty".into()));
+    }
+    Ok(json!({ "datasetId": dataset_id }))
+}
+
+pub fn set_dataset_v1(shared_state: &Value, dataset_id: &str, dataset: Value) -> Result<Vec<Value>, UiSpecError> {
+    if dataset_id.trim().is_empty() {
+        return Err(UiSpecError::ValidationError("datasetId must be non-empty".into()));
+    }
+
+    let datasets = shared_state
+        .get("ui")
+        .and_then(|ui| ui.get("datasets"))
+        .and_then(|d| d.as_object());
+
+    if datasets.is_none() {
+        return Ok(vec![json!({
+            "op": "add",
+            "path": "/ui/datasets",
+            "value": { dataset_id: dataset },
+        })]);
+    }
+
+    Ok(vec![json!({
+        "op": "add",
+        "path": format!("/ui/datasets/{}", encode_pointer(dataset_id)),
+        "value": dataset,
+    })])
+}
+
+pub fn delete_dataset_v1(shared_state: &Value, dataset_id: &str) -> Result<Vec<Value>, UiSpecError> {
+    if dataset_id.trim().is_empty() {
+        return Err(UiSpecError::ValidationError("datasetId must be non-empty".into()));
+    }
+
+    let Some(datasets) = shared_state
+        .get("ui")
+        .and_then(|ui| ui.get("datasets"))
+        .and_then(|d| d.as_object())
+    else {
+        return Ok(vec![]);
+    };
+
+    if !datasets.contains_key(dataset_id) {
+        return Ok(vec![]);
+    }
+
+    let mut next = datasets.clone();
+    next.remove(dataset_id);
+
+    Ok(vec![json!({
+        "op": "replace",
+        "path": "/ui/datasets",
+        "value": Value::Object(next),
+    })])
 }
 
 pub fn mount_component_v1(component_id: &str, message_id: &str, slot: &str, order: i64) -> Vec<Value> {

@@ -96,3 +96,10 @@ React demo MUST 包含一个 lifecycle 示例，用于验收 streaming UI 的占
 - **AND WHEN** demo 收到把 `status` 更新为 `"ready"` 的后续增量
 - **THEN** 页面展示最终组件渲染结果
 
+### Requirement: Demo demonstrates DataTable/Chart sharing a dataset
+React demo MUST 展示“同一份 dataset 被多个组件复用”的用法（至少：DataTable + Chart）。
+
+#### Scenario: Demo mounts components that reference the same datasetId
+- **WHEN** demo 加载初始 `STATE_SNAPSHOT`
+- **THEN** 至少存在两个组件通过 `dataRef.datasetId` 引用同一个 `datasetId` 并成功渲染
+

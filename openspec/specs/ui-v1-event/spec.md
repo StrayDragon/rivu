@@ -30,6 +30,9 @@ The system MUST reject `ui.v1.event` messages that fail schema validation.
 - `v`: integer equal to `1`
 - `components`: an object map keyed by `componentId`
 
+`sharedState.ui` MAY 额外包含：
+- `datasets`: an object map keyed by `datasetId`（见 `ui-datasets` spec，用于表格/图表等组件的 `dataRef` 引用）
+
 每个 `sharedState.ui.components[componentId]` 条目 MUST 包含：
 - `type`: non-empty string (component type identifier)
 - `schemaVersion`: positive integer
@@ -48,8 +51,8 @@ The system MUST reject `ui.v1.event` messages that fail schema validation.
 如果组件是 stateless，则 `state` 字段 MAY 省略。
 
 #### Scenario: `STATE_SNAPSHOT` can fully restore UI
-- **WHEN** 收到一个 `STATE_SNAPSHOT`，其 `snapshot` 包含合法的 `ui` 对象
-- **THEN** 使用方可以仅通过 `sharedState.ui.components` 还原完整的 UI 组件与 mounts
+- **WHEN** 收到一个 `STATE_SNAPSHOT`，其 `snapshot` 包含合法的 `ui` 对象（包含 `components`，并可选包含 `datasets`）
+- **THEN** 使用方可以从 `sharedState.ui` 还原完整 UI（包含组件 mounts，以及组件所引用的数据集）
 
 ### Requirement: Revisions support optimistic concurrency
 对于任何 stateful 组件，服务端 MUST 将 `sharedState.ui.components[componentId].revision` 视为权威 revision。

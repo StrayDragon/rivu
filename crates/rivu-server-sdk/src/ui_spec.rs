@@ -225,9 +225,68 @@ impl UiComponentV1 {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UiDatasetV1 {
+    pub columns: Vec<String>,
+    pub rows: Vec<Vec<Value>>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl UiDatasetV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if self.columns.is_empty() {
+            return Err(UiSpecError::ValidationError("dataset.columns must be non-empty".into()));
+        }
+        for col in &self.columns {
+            if col.is_empty() {
+                return Err(UiSpecError::ValidationError("dataset.columns[*] must be non-empty".into()));
+            }
+        }
+        for row in &self.rows {
+            if row.len() != self.columns.len() {
+                return Err(UiSpecError::ValidationError(
+                    "dataset.rows[i] length must match columns length".into(),
+                ));
+            }
+            for cell in row {
+                match cell {
+                    Value::Null | Value::String(_) | Value::Number(_) => {}
+                    _ => {
+                        return Err(UiSpecError::ValidationError(
+                            "dataset.rows[*][*] must be string|number|null".into(),
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UiDataRefV1 {
+    pub dataset_id: String,
+}
+
+impl UiDataRefV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if self.dataset_id.trim().is_empty() {
+            return Err(UiSpecError::ValidationError("dataRef.datasetId must be non-empty".into()));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UiStateV1 {
     pub v: u64,
     pub components: BTreeMap<String, UiComponentV1>,
+
+    #[serde(default)]
+    pub datasets: Option<BTreeMap<String, UiDatasetV1>>,
 
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
@@ -244,6 +303,14 @@ impl UiStateV1 {
             }
             component.validate()?;
         }
+        if let Some(datasets) = &self.datasets {
+            for (id, dataset) in datasets {
+                if id.trim().is_empty() {
+                    return Err(UiSpecError::ValidationError("datasetId must be non-empty".into()));
+                }
+                dataset.validate()?;
+            }
+        }
         Ok(())
     }
 }
@@ -254,6 +321,22 @@ pub fn parse_ui_state_v1(bytes: &[u8], limits: DecodeLimits) -> Result<UiStateV1
     let state: UiStateV1 = serde_json::from_value(value)?;
     state.validate()?;
     Ok(state)
+}
+
+pub fn parse_ui_dataset_v1(bytes: &[u8], limits: DecodeLimits) -> Result<UiDatasetV1, UiSpecError> {
+    let value: Value = serde_json::from_slice(bytes)?;
+    check_limits(bytes, &value, limits)?;
+    let dataset: UiDatasetV1 = serde_json::from_value(value)?;
+    dataset.validate()?;
+    Ok(dataset)
+}
+
+pub fn parse_ui_data_ref_v1(bytes: &[u8], limits: DecodeLimits) -> Result<UiDataRefV1, UiSpecError> {
+    let value: Value = serde_json::from_slice(bytes)?;
+    check_limits(bytes, &value, limits)?;
+    let data_ref: UiDataRefV1 = serde_json::from_value(value)?;
+    data_ref.validate()?;
+    Ok(data_ref)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

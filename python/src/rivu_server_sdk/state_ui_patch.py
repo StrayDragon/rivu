@@ -13,6 +13,63 @@ def _encode_pointer(token: str) -> str:
     return token.replace("~", "~0").replace("/", "~1")
 
 
+def data_ref_v1(*, dataset_id: str) -> dict[str, str]:
+    if not dataset_id.strip():
+        raise ValueError("dataRef.datasetId must be non-empty")
+    return {"datasetId": dataset_id}
+
+
+def set_dataset_v1(*, shared_state: dict[str, Any], dataset_id: str, dataset: dict[str, Any]) -> list[JsonPatchOp]:
+    if not dataset_id.strip():
+        raise ValueError("datasetId must be non-empty")
+
+    ui_raw = shared_state.get("ui")
+    datasets_raw: Any = None
+    if isinstance(ui_raw, dict):
+        datasets_raw = ui_raw.get("datasets")
+
+    if not isinstance(datasets_raw, dict):
+        return [
+            {
+                "op": "add",
+                "path": "/ui/datasets",
+                "value": {dataset_id: dataset},
+            }
+        ]
+
+    return [
+        {
+            "op": "add",
+            "path": f"/ui/datasets/{_encode_pointer(dataset_id)}",
+            "value": dataset,
+        }
+    ]
+
+
+def delete_dataset_v1(*, shared_state: dict[str, Any], dataset_id: str) -> list[JsonPatchOp]:
+    if not dataset_id.strip():
+        raise ValueError("datasetId must be non-empty")
+
+    ui_raw = shared_state.get("ui")
+    if not isinstance(ui_raw, dict):
+        return []
+    datasets_raw = ui_raw.get("datasets")
+    if not isinstance(datasets_raw, dict):
+        return []
+    if dataset_id not in datasets_raw:
+        return []
+
+    next_datasets = {k: v for k, v in datasets_raw.items() if k != dataset_id}
+
+    return [
+        {
+            "op": "replace",
+            "path": "/ui/datasets",
+            "value": next_datasets,
+        }
+    ]
+
+
 def mount_component_v1(*, component_id: str, message_id: str, slot: str, order: int) -> list[JsonPatchOp]:
     return [
         {

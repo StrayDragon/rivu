@@ -2,7 +2,11 @@ import type { CSSProperties } from 'react';
 import type { ReactNode } from 'react';
 import { z } from 'zod';
 
+import { selectUiDatasetV1 } from 'rivu-kernel';
+import { uiDataRefV1Schema } from 'rivu-ui-spec';
+
 import type { RivuComponentRegistration, RivuComponentRegistry } from '../registry.js';
+import { UnknownComponentCard } from '../unknown-component-card.js';
 
 const theme = {
   bg: 'var(--rivu-bg, #fff)',
@@ -121,6 +125,7 @@ const dataTableAlignSchema = z.enum(['left', 'center', 'right']);
 export const dataTablePropsV1Schema = z
   .object({
     caption: z.string().optional(),
+    dataRef: uiDataRefV1Schema.optional(),
     columns: z
       .array(
         z
@@ -234,7 +239,49 @@ export function DataTable(props: DataTablePropsV1 & { className?: string; style?
 export const dataTableRegistrationV1: RivuComponentRegistration<DataTablePropsV1> = {
   schemaVersion: DATA_TABLE_SCHEMA_VERSION,
   propsSchema: dataTablePropsV1Schema,
-  render: ({ props }) => <DataTable {...props} />,
+  render: ({ kernel, componentId, componentType, schemaVersion, props }) => {
+    if (props.dataRef) {
+      const datasetId = props.dataRef.datasetId;
+      const dataset = selectUiDatasetV1(kernel.getState(), datasetId);
+      if (!dataset) {
+        return (
+          <UnknownComponentCard
+            title="Dataset not found"
+            componentId={componentId}
+            componentType={componentType}
+            schemaVersion={schemaVersion}
+            details={{ datasetId }}
+          />
+        );
+      }
+
+      const indexes = new Map(dataset.columns.map((name, i) => [name, i] as const));
+      const missingColumns = props.columns.filter((col) => !indexes.has(col.key)).map((col) => col.key);
+      if (missingColumns.length > 0) {
+        return (
+          <UnknownComponentCard
+            title="Dataset column mismatch"
+            componentId={componentId}
+            componentType={componentType}
+            schemaVersion={schemaVersion}
+            details={{ datasetId, missingColumns, datasetColumns: dataset.columns }}
+          />
+        );
+      }
+
+      const resolvedRows = dataset.rows.map((row) => {
+        const out: Record<string, string | number | null> = {};
+        for (const col of props.columns) {
+          out[col.key] = (row[indexes.get(col.key)!] as any) ?? null;
+        }
+        return out;
+      });
+
+      return <DataTable {...props} rows={resolvedRows} />;
+    }
+
+    return <DataTable {...props} />;
+  },
 };
 
 export const BAR_CHART_COMPONENT_TYPE = 'BarChart' as const;
@@ -243,6 +290,7 @@ export const barChartPropsV1Schema = z
   .object({
     title: z.string().optional(),
     unit: z.string().optional(),
+    dataRef: uiDataRefV1Schema.optional(),
     items: z.array(z.object({ label: z.string().min(1), value: z.number().finite() }).strict()),
   })
   .strict();
@@ -283,7 +331,46 @@ export function BarChart(props: BarChartPropsV1 & { className?: string; style?: 
 export const barChartRegistrationV1: RivuComponentRegistration<BarChartPropsV1> = {
   schemaVersion: BAR_CHART_SCHEMA_VERSION,
   propsSchema: barChartPropsV1Schema,
-  render: ({ props }) => <BarChart {...props} />,
+  render: ({ kernel, componentId, componentType, schemaVersion, props }) => {
+    if (props.dataRef) {
+      const datasetId = props.dataRef.datasetId;
+      const dataset = selectUiDatasetV1(kernel.getState(), datasetId);
+      if (!dataset) {
+        return (
+          <UnknownComponentCard
+            title="Dataset not found"
+            componentId={componentId}
+            componentType={componentType}
+            schemaVersion={schemaVersion}
+            details={{ datasetId }}
+          />
+        );
+      }
+
+      const labelIndex = dataset.columns.indexOf('label');
+      const valueIndex = dataset.columns.indexOf('value');
+      if (labelIndex < 0 || valueIndex < 0) {
+        return (
+          <UnknownComponentCard
+            title="Dataset column mismatch"
+            componentId={componentId}
+            componentType={componentType}
+            schemaVersion={schemaVersion}
+            details={{ datasetId, requiredColumns: ['label', 'value'], datasetColumns: dataset.columns }}
+          />
+        );
+      }
+
+      const items = dataset.rows
+        .map((row) => ({ label: row[labelIndex], value: row[valueIndex] }))
+        .filter((item): item is { label: string; value: number } => typeof item.label === 'string' && item.label.trim() !== '' && typeof item.value === 'number' && Number.isFinite(item.value))
+        .map((item) => ({ label: item.label, value: item.value }));
+
+      return <BarChart {...props} items={items} />;
+    }
+
+    return <BarChart {...props} />;
+  },
 };
 
 export const LINE_CHART_COMPONENT_TYPE = 'LineChart' as const;

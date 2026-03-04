@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { uiDatasetV1Schema } from './ui-datasets.js';
+
 const nonEmptyString = z.string().min(1);
 const nonNegativeInt = z.number().int().min(0);
 const positiveInt = z.number().int().min(1);
@@ -60,20 +62,32 @@ export type UiComponentV1 = z.output<typeof uiComponentV1Schema>;
 export const uiStateV1Schema = z
   .object({
     v: z.literal(1),
-    components: z
-      .record(z.string(), uiComponentV1Schema)
-      .superRefine((components, ctx) => {
-        for (const id of Object.keys(components)) {
-          if (!id.trim()) {
-            ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: 'componentId must be non-empty',
-            });
-            return;
-          }
-        }
-      }),
+    components: z.record(z.string(), uiComponentV1Schema),
+    datasets: z.record(z.string(), uiDatasetV1Schema).optional(),
   })
-  .passthrough();
+  .passthrough()
+  .superRefine((ui, ctx) => {
+    for (const id of Object.keys(ui.components)) {
+      if (!id.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'componentId must be non-empty',
+        });
+        return;
+      }
+    }
+
+    if (ui.datasets) {
+      for (const id of Object.keys(ui.datasets)) {
+        if (!id.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'datasetId must be non-empty',
+          });
+          return;
+        }
+      }
+    }
+  });
 
 export type UiStateV1 = z.output<typeof uiStateV1Schema>;

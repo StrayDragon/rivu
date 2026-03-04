@@ -19,5 +19,6 @@ export type { MountedUiComponentV1 } from './selectors.js';
 export {
   selectMountedUiComponentsV1,
   selectUiComponentV1,
+  selectUiDatasetV1,
   selectUiStateV1,
 } from './selectors.js';

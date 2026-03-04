@@ -3,6 +3,9 @@ export const RIVU_UI_SPEC_VERSION = 1 as const;
 export type { UiComponentV1, UiMountV1, UiStateV1 } from './state-ui.js';
 export { uiComponentV1Schema, uiMountV1Schema, uiStateV1Schema } from './state-ui.js';
 
+export type { UiDataRefV1, UiDatasetV1 } from './ui-datasets.js';
+export { uiDataRefV1Schema, uiDatasetV1Schema } from './ui-datasets.js';
+
 export type { UiV1CustomEvent, UiV1EventValue } from './ui-v1-event.js';
 export {
   UI_V1_EVENT_NAME,
@@ -31,6 +34,8 @@ export {
 
 export {
   uiStateV1JsonSchema,
+  uiDatasetV1JsonSchema,
+  uiDataRefV1JsonSchema,
   uiInputLimitsV1JsonSchema,
   uiV1CustomEventJsonSchema,
   uiV1EventValueJsonSchema,

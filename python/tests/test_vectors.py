@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from rivu_server_sdk import UiStateV1, UiV1CustomEvent
+from rivu_server_sdk import UiDataRefV1, UiDatasetV1, UiStateV1, UiV1CustomEvent
 from rivu_server_sdk.limits import LimitExceededError, check_json_patch_limits_v1, check_ui_state_limits_v1, check_ui_v1_event_limits_v1
 
 
@@ -33,6 +33,28 @@ def test_vectors_ui_state_v1_valid_invalid() -> None:
     for item in vectors["uiStateV1"]["invalid"]:
         with pytest.raises(Exception):
             UiStateV1.model_validate(item)
+
+
+def test_vectors_ui_dataset_v1_valid_invalid() -> None:
+    vectors = _load_vectors()
+
+    for item in vectors["uiDatasetV1"]["valid"]:
+        UiDatasetV1.model_validate(item)
+
+    for item in vectors["uiDatasetV1"]["invalid"]:
+        with pytest.raises(Exception):
+            UiDatasetV1.model_validate(item)
+
+
+def test_vectors_ui_data_ref_v1_valid_invalid() -> None:
+    vectors = _load_vectors()
+
+    for item in vectors["uiDataRefV1"]["valid"]:
+        UiDataRefV1.model_validate(item)
+
+    for item in vectors["uiDataRefV1"]["invalid"]:
+        with pytest.raises(Exception):
+            UiDataRefV1.model_validate(item)
 
 
 def test_vectors_limits_v1_accept_reject() -> None:

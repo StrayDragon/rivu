@@ -1,4 +1,4 @@
-import { selectUiComponentV1, type RivuKernelState } from 'rivu-kernel';
+import { selectUiComponentV1, selectUiDatasetV1, type RivuKernelState } from 'rivu-kernel';
 
 import type { RivuSvelteComponentRegistry } from './registry.js';
 
@@ -90,13 +90,96 @@ export function resolveUiComponentV1(params: {
     };
   }
 
+  const dataRefResolution:
+    | { ok: true; props: unknown }
+    | { ok: false; reason: string; details: Record<string, unknown> } = (() => {
+    const props = propsResult.data as any;
+    if (!props || typeof props !== 'object' || Array.isArray(props)) return { ok: true, props: propsResult.data };
+    const dataRef = (props as any).dataRef;
+    if (!dataRef || typeof dataRef !== 'object' || Array.isArray(dataRef)) return { ok: true, props: propsResult.data };
+    const datasetId = (dataRef as any).datasetId;
+    if (typeof datasetId !== 'string' || !datasetId.trim()) {
+      return { ok: false, reason: 'dataRef_invalid', details: { datasetId } };
+    }
+
+    const dataset = selectUiDatasetV1(params.state, datasetId);
+    if (!dataset) return { ok: false, reason: 'dataset_not_found', details: { datasetId } };
+
+    if (component.type === 'DataTable') {
+      const columns = (props as any).columns;
+      if (!Array.isArray(columns)) return { ok: false, reason: 'dataTable_columns_invalid', details: { datasetId } };
+
+      const indexes = new Map(dataset.columns.map((name, i) => [name, i] as const));
+      const missingColumns = columns
+        .filter(
+          (c) =>
+            !c ||
+            typeof c !== 'object' ||
+            Array.isArray(c) ||
+            typeof (c as any).key !== 'string' ||
+            !indexes.has((c as any).key),
+        )
+        .map((c) => (c as any)?.key);
+      if (missingColumns.length > 0) {
+        return {
+          ok: false,
+          reason: 'dataset_column_mismatch',
+          details: { datasetId, missingColumns, datasetColumns: dataset.columns },
+        };
+      }
+
+      const rows = dataset.rows.map((row) => {
+        const out: Record<string, string | number | null> = {};
+        for (const col of columns) {
+          out[(col as any).key] = (row[indexes.get((col as any).key)!] as any) ?? null;
+        }
+        return out;
+      });
+
+      return { ok: true, props: { ...props, rows } };
+    }
+
+    if (component.type === 'BarChart') {
+      const labelIndex = dataset.columns.indexOf('label');
+      const valueIndex = dataset.columns.indexOf('value');
+      if (labelIndex < 0 || valueIndex < 0) {
+        return {
+          ok: false,
+          reason: 'dataset_column_mismatch',
+          details: { datasetId, requiredColumns: ['label', 'value'], datasetColumns: dataset.columns },
+        };
+      }
+
+      const items = dataset.rows
+        .map((row) => ({ label: row[labelIndex], value: row[valueIndex] }))
+        .filter((item): item is { label: string; value: number } => typeof item.label === 'string' && item.label.trim() !== '' && typeof item.value === 'number' && Number.isFinite(item.value))
+        .map((item) => ({ label: item.label, value: item.value }));
+
+      return { ok: true, props: { ...props, items } };
+    }
+
+    return { ok: true, props: propsResult.data };
+  })();
+
+  if (!dataRefResolution.ok) {
+    return {
+      status: 'invalid_props',
+      details: {
+        componentId: params.componentId,
+        componentType: component.type,
+        reason: dataRefResolution.reason,
+        ...dataRefResolution.details,
+      },
+    };
+  }
+
   return {
     status: 'ok',
     componentId: params.componentId,
     componentType: component.type,
     schemaVersion: component.schemaVersion,
     Component: registration.Component,
-    props: propsResult.data,
+    props: dataRefResolution.props,
     state: stateResult ? stateResult.data : undefined,
   };
 }

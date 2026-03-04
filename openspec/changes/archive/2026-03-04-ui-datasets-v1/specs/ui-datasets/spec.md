@@ -15,10 +15,16 @@ datasets MUST 可被 `STATE_SNAPSHOT` / `STATE_DELTA` 回放恢复，并且属�
 - `columns: string[]`（non-empty）
 - `rows: (string | number | null)[][]`
 
+每个 `rows[i]` MUST 与 `columns` 等长（列数一致），以保证可预测的回放与导出。
+
 实现 MUST 支持对 datasets 做 schema 校验，并允许配置 limits（例如 max bytes/max depth/max rows）。
 
 #### Scenario: Reject dataset with empty columns
 - **WHEN** 一个 dataset 的 `columns` 为空数组
+- **THEN** 校验器拒绝该 dataset
+
+#### Scenario: Reject dataset with row width mismatch
+- **WHEN** 一个 dataset 的某一行 `rows[i].length != columns.length`
 - **THEN** 校验器拒绝该 dataset
 
 ### Requirement: Components may reference datasets via `dataRef`

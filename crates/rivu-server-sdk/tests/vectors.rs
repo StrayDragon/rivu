@@ -2,7 +2,7 @@ use std::path::Path;
 
 use rivu_server_sdk::{
     check_json_patch_limits_v1, check_ui_state_limits_v1, check_ui_v1_event_limits_v1, parse_ui_state_v1,
-    parse_ui_v1_custom_event, DecodeLimits, UiInputLimitsV1,
+    parse_ui_data_ref_v1, parse_ui_dataset_v1, parse_ui_v1_custom_event, DecodeLimits, UiInputLimitsV1,
 };
 
 #[test]
@@ -44,6 +44,48 @@ fn vectors_ui_state_v1_valid_invalid() {
         let bytes = serde_json::to_vec(item).expect("serialize");
         let result = parse_ui_state_v1(&bytes, DecodeLimits::default());
         assert!(result.is_err(), "expected invalid uiStateV1[{}] to fail", i);
+    }
+}
+
+#[test]
+fn vectors_ui_dataset_v1_valid_invalid() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../spec/vectors/ui-v1.v1.json");
+    let raw = std::fs::read_to_string(path).expect("read vectors");
+    let vectors: serde_json::Value = serde_json::from_str(&raw).expect("parse vectors json");
+
+    let valid = vectors["uiDatasetV1"]["valid"].as_array().expect("valid array");
+    for (i, item) in valid.iter().enumerate() {
+        let bytes = serde_json::to_vec(item).expect("serialize");
+        let result = parse_ui_dataset_v1(&bytes, DecodeLimits::default());
+        assert!(result.is_ok(), "expected valid uiDatasetV1[{}] to parse", i);
+    }
+
+    let invalid = vectors["uiDatasetV1"]["invalid"].as_array().expect("invalid array");
+    for (i, item) in invalid.iter().enumerate() {
+        let bytes = serde_json::to_vec(item).expect("serialize");
+        let result = parse_ui_dataset_v1(&bytes, DecodeLimits::default());
+        assert!(result.is_err(), "expected invalid uiDatasetV1[{}] to fail", i);
+    }
+}
+
+#[test]
+fn vectors_ui_data_ref_v1_valid_invalid() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../spec/vectors/ui-v1.v1.json");
+    let raw = std::fs::read_to_string(path).expect("read vectors");
+    let vectors: serde_json::Value = serde_json::from_str(&raw).expect("parse vectors json");
+
+    let valid = vectors["uiDataRefV1"]["valid"].as_array().expect("valid array");
+    for (i, item) in valid.iter().enumerate() {
+        let bytes = serde_json::to_vec(item).expect("serialize");
+        let result = parse_ui_data_ref_v1(&bytes, DecodeLimits::default());
+        assert!(result.is_ok(), "expected valid uiDataRefV1[{}] to parse", i);
+    }
+
+    let invalid = vectors["uiDataRefV1"]["invalid"].as_array().expect("invalid array");
+    for (i, item) in invalid.iter().enumerate() {
+        let bytes = serde_json::to_vec(item).expect("serialize");
+        let result = parse_ui_data_ref_v1(&bytes, DecodeLimits::default());
+        assert!(result.is_err(), "expected invalid uiDataRefV1[{}] to fail", i);
     }
 }
 

@@ -1,6 +1,7 @@
 import {
   uiStateV1Schema,
   type UiComponentV1,
+  type UiDatasetV1,
   type UiMountV1,
   type UiStateV1,
 } from 'rivu-ui-spec';
@@ -25,6 +26,12 @@ export function selectUiComponentV1(state: RivuKernelState, componentId: string)
   return uiState.components[componentId] ?? null;
 }
 
+export function selectUiDatasetV1(state: RivuKernelState, datasetId: string): UiDatasetV1 | null {
+  const uiState = selectUiStateV1(state);
+  if (!uiState?.datasets) return null;
+  return uiState.datasets[datasetId] ?? null;
+}
+
 export function selectMountedUiComponentsV1(params: {
   state: RivuKernelState;
   messageId: string;
@@ -46,4 +53,3 @@ export function selectMountedUiComponentsV1(params: {
   mounted.sort((a, b) => a.mount.order - b.mount.order);
   return mounted;
 }
-
