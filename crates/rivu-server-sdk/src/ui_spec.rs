@@ -341,6 +341,169 @@ pub fn parse_ui_data_ref_v1(bytes: &[u8], limits: DecodeLimits) -> Result<UiData
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct A2uiMountV1 {
+    pub message_id: String,
+    pub slot: String,
+    #[serde(default)]
+    pub order: Option<i64>,
+}
+
+impl A2uiMountV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if self.message_id.trim().is_empty() {
+            return Err(UiSpecError::ValidationError("mount.messageId must be non-empty".into()));
+        }
+        if self.slot.trim().is_empty() {
+            return Err(UiSpecError::ValidationError("mount.slot must be non-empty".into()));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "op", rename_all = "lowercase", rename_all_fields = "camelCase")]
+pub enum A2uiOpV1 {
+    Create {
+        key: String,
+        #[serde(rename = "type")]
+        component_type: String,
+        schema_version: u64,
+        props: Map<String, Value>,
+        #[serde(default)]
+        state: Option<Map<String, Value>>,
+        #[serde(default)]
+        mount: Option<A2uiMountV1>,
+    },
+    Update {
+        key: String,
+        #[serde(default)]
+        props: Option<Map<String, Value>>,
+        #[serde(default)]
+        state: Option<Map<String, Value>>,
+    },
+    Mount {
+        key: String,
+        message_id: String,
+        slot: String,
+        #[serde(default)]
+        order: Option<i64>,
+    },
+    Unmount {
+        key: String,
+        message_id: String,
+        slot: String,
+    },
+    Remove {
+        key: String,
+    },
+}
+
+impl A2uiOpV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        match self {
+            A2uiOpV1::Create {
+                key,
+                component_type,
+                schema_version,
+                mount,
+                ..
+            } => {
+                if key.trim().is_empty() {
+                    return Err(UiSpecError::ValidationError("op.key must be non-empty".into()));
+                }
+                if component_type.trim().is_empty() {
+                    return Err(UiSpecError::ValidationError("op.type must be non-empty".into()));
+                }
+                if *schema_version == 0 {
+                    return Err(UiSpecError::ValidationError("op.schemaVersion must be >= 1".into()));
+                }
+                if let Some(mount) = mount {
+                    mount.validate()?;
+                }
+                Ok(())
+            }
+            A2uiOpV1::Update { key, props, state } => {
+                if key.trim().is_empty() {
+                    return Err(UiSpecError::ValidationError("op.key must be non-empty".into()));
+                }
+                if props.is_none() && state.is_none() {
+                    return Err(UiSpecError::ValidationError(
+                        "update op must include props and/or state".into(),
+                    ));
+                }
+                Ok(())
+            }
+            A2uiOpV1::Mount {
+                key,
+                message_id,
+                slot,
+                ..
+            } => {
+                if key.trim().is_empty() {
+                    return Err(UiSpecError::ValidationError("op.key must be non-empty".into()));
+                }
+                if message_id.trim().is_empty() {
+                    return Err(UiSpecError::ValidationError("mount op.messageId must be non-empty".into()));
+                }
+                if slot.trim().is_empty() {
+                    return Err(UiSpecError::ValidationError("mount op.slot must be non-empty".into()));
+                }
+                Ok(())
+            }
+            A2uiOpV1::Unmount { key, message_id, slot } => {
+                if key.trim().is_empty() {
+                    return Err(UiSpecError::ValidationError("op.key must be non-empty".into()));
+                }
+                if message_id.trim().is_empty() {
+                    return Err(UiSpecError::ValidationError("unmount op.messageId must be non-empty".into()));
+                }
+                if slot.trim().is_empty() {
+                    return Err(UiSpecError::ValidationError("unmount op.slot must be non-empty".into()));
+                }
+                Ok(())
+            }
+            A2uiOpV1::Remove { key } => {
+                if key.trim().is_empty() {
+                    return Err(UiSpecError::ValidationError("op.key must be non-empty".into()));
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct A2uiV1 {
+    pub v: u64,
+    pub ops: Vec<A2uiOpV1>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl A2uiV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if self.v != 1 {
+            return Err(UiSpecError::ValidationError("a2ui.v must be 1".into()));
+        }
+        for op in &self.ops {
+            op.validate()?;
+        }
+        Ok(())
+    }
+}
+
+pub fn parse_a2ui_v1(bytes: &[u8], limits: DecodeLimits) -> Result<A2uiV1, UiSpecError> {
+    let value: Value = serde_json::from_slice(bytes)?;
+    check_limits(bytes, &value, limits)?;
+    let payload: A2uiV1 = serde_json::from_value(value)?;
+    payload.validate()?;
+    Ok(payload)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReduceGapV1 {
     pub expected_seq: u64,
     pub got_seq: u64,

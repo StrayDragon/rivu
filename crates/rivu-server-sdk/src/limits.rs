@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::ui_spec::A2uiV1;
 use crate::UiSpecError;
 use crate::UiV1CustomEvent;
 
@@ -131,6 +132,14 @@ pub enum DecodeUiV1CustomEventErrorV1 {
     LimitExceeded(LimitExceededErrorV1),
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum DecodeA2uiV1ErrorV1 {
+    #[error(transparent)]
+    Spec(#[from] UiSpecError),
+    #[error("limit exceeded")]
+    LimitExceeded(LimitExceededErrorV1),
+}
+
 fn compute_max_depth(value: &Value) -> u64 {
     let mut max_seen: u64 = 1;
     let mut stack: Vec<(&Value, u64)> = vec![(value, 1)];
@@ -239,6 +248,50 @@ pub fn decode_ui_v1_custom_event_with_limits_v1(
     }
 
     Ok(event)
+}
+
+pub fn decode_a2ui_v1_with_limits_v1(bytes: &[u8], limits: &UiInputLimitsV1) -> Result<A2uiV1, DecodeA2uiV1ErrorV1> {
+    if let Some(decode) = &limits.decode {
+        if let Some(max_bytes) = decode.max_bytes {
+            let observed = bytes.len() as u64;
+            if observed > max_bytes {
+                return Err(DecodeA2uiV1ErrorV1::LimitExceeded(limit_exceeded(
+                    "decode.maxBytes",
+                    max_bytes,
+                    observed,
+                )));
+            }
+        }
+    }
+
+    let value: Value = serde_json::from_slice(bytes).map_err(UiSpecError::from)?;
+
+    if let Some(decode) = &limits.decode {
+        if let Some(max_depth) = decode.max_depth {
+            let observed = compute_max_depth(&value);
+            if observed > max_depth {
+                return Err(DecodeA2uiV1ErrorV1::LimitExceeded(limit_exceeded(
+                    "decode.maxDepth",
+                    max_depth,
+                    observed,
+                )));
+            }
+        }
+        if let Some(max_string_length) = decode.max_string_length {
+            let observed = compute_max_string_length(&value);
+            if observed > max_string_length {
+                return Err(DecodeA2uiV1ErrorV1::LimitExceeded(limit_exceeded(
+                    "decode.maxStringLength",
+                    max_string_length,
+                    observed,
+                )));
+            }
+        }
+    }
+
+    let payload: A2uiV1 = serde_json::from_value(value).map_err(UiSpecError::from)?;
+    payload.validate()?;
+    Ok(payload)
 }
 
 pub fn check_ui_v1_event_limits_v1(event: &UiV1CustomEvent, limits: &UiInputLimitsV1) -> Result<(), LimitExceededErrorV1> {

@@ -90,6 +90,30 @@ def set_component_v1(*, component_id: str, component: dict[str, Any]) -> list[Js
     ]
 
 
+def delete_component_v1(*, shared_state: dict[str, Any], component_id: str) -> list[JsonPatchOp]:
+    if not component_id.strip():
+        raise ValueError("componentId must be non-empty")
+
+    ui_raw = shared_state.get("ui")
+    if not isinstance(ui_raw, dict):
+        return []
+    components_raw = ui_raw.get("components")
+    if not isinstance(components_raw, dict):
+        return []
+    if component_id not in components_raw:
+        return []
+
+    next_components = {k: v for k, v in components_raw.items() if k != component_id}
+
+    return [
+        {
+            "op": "replace",
+            "path": "/ui/components",
+            "value": next_components,
+        }
+    ]
+
+
 def unmount_component_v1(*, shared_state: dict[str, Any], component_id: str, message_id: str, slot: str) -> list[JsonPatchOp]:
     ui_raw = shared_state.get("ui")
     if not isinstance(ui_raw, dict):

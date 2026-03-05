@@ -2,6 +2,7 @@ from .state_ui import UiComponentV1, UiDataRefV1, UiDatasetV1, UiMountV1, UiStat
 from .state_ui_patch import (
     JsonPatchOp,
     data_ref_v1,
+    delete_component_v1,
     delete_dataset_v1,
     increment_component_revision_v1,
     mount_component_v1,
@@ -11,6 +12,8 @@ from .state_ui_patch import (
     set_dataset_v1,
     unmount_component_v1,
 )
+from .a2ui_v1 import A2uiV1, decode_a2ui_v1_with_limits_v1
+from .a2ui_bridge import InMemoryKeyMapStore, SqliteKeyMapStore, compile_a2ui_v1
 from .ui_v1_event import UI_V1_EVENT_NAME, UiV1CustomEvent, UiV1EventValue
 from .seq import SeqAllocator
 from .sse import encode_sse_event
@@ -34,6 +37,7 @@ __all__ = [
     "UiV1CustomEvent",
     "JsonPatchOp",
     "data_ref_v1",
+    "delete_component_v1",
     "set_dataset_v1",
     "delete_dataset_v1",
     "mount_component_v1",
@@ -42,6 +46,11 @@ __all__ = [
     "set_component_props_v1",
     "set_component_state_v1",
     "increment_component_revision_v1",
+    "A2uiV1",
+    "decode_a2ui_v1_with_limits_v1",
+    "compile_a2ui_v1",
+    "InMemoryKeyMapStore",
+    "SqliteKeyMapStore",
     "UiMountV1",
     "UiComponentV1",
     "UiDatasetV1",

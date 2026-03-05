@@ -1,5 +1,8 @@
-## ADDED Requirements
+# a2ui-bridge Specification
 
+## Purpose
+TBD - created by archiving change a2ui-bridge-v1. Update Purpose after archive.
+## Requirements
 ### Requirement: A2UI payload 使用紧凑的 `a2ui.v1` schema
 系统 MUST 定义一套紧凑、面向智能体（agent-oriented）的 A2UI payload schema：`a2ui.v1`，用于 LLM 输出。
 
@@ -64,3 +67,4 @@ vectors MUST 可被 TypeScript、Python、Rust 测试套件消费。
 #### Scenario: 跨语言编译对 vectors 达成一致
 - **WHEN** 各语言实现编译同一个 golden vector 输入
 - **THEN** 它们产出等价的 patch outputs（或 vectors 定义的等价语义输出）
+

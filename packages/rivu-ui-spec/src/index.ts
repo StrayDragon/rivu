@@ -6,6 +6,9 @@ export { uiComponentV1Schema, uiMountV1Schema, uiStateV1Schema } from './state-u
 export type { UiDataRefV1, UiDatasetV1 } from './ui-datasets.js';
 export { uiDataRefV1Schema, uiDatasetV1Schema } from './ui-datasets.js';
 
+export type { A2uiCreateOpV1, A2uiMountOpV1, A2uiMountV1, A2uiOpV1, A2uiRemoveOpV1, A2uiUnmountOpV1, A2uiUpdateOpV1, A2uiV1 } from './a2ui-v1.js';
+export { a2uiOpV1Schema, a2uiV1Schema } from './a2ui-v1.js';
+
 export type { ChartEncodingV1, ChartMarkV1, ChartOptionsV1, ChartPropsV1 } from './ui-chart.js';
 export { chartEncodingV1Schema, chartMarkV1Schema, chartOptionsV1Schema, chartPropsV1Schema } from './ui-chart.js';
 
@@ -39,6 +42,7 @@ export {
   uiStateV1JsonSchema,
   uiDatasetV1JsonSchema,
   uiDataRefV1JsonSchema,
+  a2uiV1JsonSchema,
   chartPropsV1JsonSchema,
   uiInputLimitsV1JsonSchema,
   uiV1CustomEventJsonSchema,

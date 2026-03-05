@@ -1,0 +1,308 @@
+{
+  "version": 1,
+  "a2uiV1": {
+    "valid": [
+      {
+        "v": 1,
+        "ops": []
+      },
+      {
+        "v": 1,
+        "ops": [
+          {
+            "op": "create",
+            "key": "k_metric_revenue",
+            "type": "MetricCard",
+            "schemaVersion": 1,
+            "props": { "label": "Revenue", "value": 128430, "unit": "USD" },
+            "mount": { "messageId": "msg_1", "slot": "inline", "order": 1 }
+          }
+        ]
+      },
+      {
+        "v": 1,
+        "ops": [
+          {
+            "op": "update",
+            "key": "k_metric_revenue",
+            "props": { "label": "Revenue", "value": 129001, "unit": "USD" }
+          }
+        ]
+      },
+      {
+        "v": 1,
+        "ops": [
+          {
+            "op": "mount",
+            "key": "k_metric_revenue",
+            "messageId": "msg_1",
+            "slot": "inline"
+          }
+        ]
+      },
+      {
+        "v": 1,
+        "ops": [
+          {
+            "op": "unmount",
+            "key": "k_metric_revenue",
+            "messageId": "msg_1",
+            "slot": "inline"
+          }
+        ]
+      },
+      {
+        "v": 1,
+        "ops": [
+          {
+            "op": "remove",
+            "key": "k_metric_revenue"
+          }
+        ]
+      }
+    ],
+    "invalid": [
+      null,
+      {},
+      { "v": 2, "ops": [] },
+      { "v": 1, "ops": {} },
+      { "v": 1, "ops": [null] },
+      { "v": 1, "ops": [{ "op": "nope", "key": "k1" }] },
+      {
+        "v": 1,
+        "ops": [
+          {
+            "op": "create",
+            "key": "k1",
+            "schemaVersion": 1,
+            "props": {}
+          }
+        ]
+      },
+      {
+        "v": 1,
+        "ops": [
+          {
+            "op": "create",
+            "key": "k1",
+            "type": "",
+            "schemaVersion": 1,
+            "props": {}
+          }
+        ]
+      },
+      {
+        "v": 1,
+        "ops": [
+          {
+            "op": "update",
+            "key": "k1"
+          }
+        ]
+      },
+      {
+        "v": 1,
+        "ops": [
+          {
+            "op": "mount",
+            "key": "k1",
+            "messageId": "",
+            "slot": "inline"
+          }
+        ]
+      },
+      {
+        "v": 1,
+        "ops": [
+          {
+            "op": "unmount",
+            "key": "k1",
+            "messageId": "msg_1",
+            "slot": ""
+          }
+        ]
+      },
+      {
+        "v": 1,
+        "ops": [
+          {
+            "op": "remove",
+            "key": "   "
+          }
+        ]
+      }
+    ]
+  },
+  "compileA2uiV1": [
+    {
+      "id": "create_metric_and_mount",
+      "threadId": "t1",
+      "initialSharedState": { "ui": { "v": 1, "components": {} } },
+      "initialKeyMap": {},
+      "input": {
+        "v": 1,
+        "ops": [
+          {
+            "op": "create",
+            "key": "k_metric_revenue",
+            "type": "MetricCard",
+            "schemaVersion": 1,
+            "props": { "label": "Revenue", "value": 128430, "unit": "USD" },
+            "mount": { "messageId": "msg_1", "slot": "inline", "order": 1 }
+          }
+        ]
+      },
+      "expect": {
+        "patchOps": [
+          {
+            "op": "add",
+            "path": "/ui/components/cmp_k_metric_revenue",
+            "value": {
+              "type": "MetricCard",
+              "schemaVersion": 1,
+              "props": { "label": "Revenue", "value": 128430, "unit": "USD" },
+              "revision": 0,
+              "mounts": []
+            }
+          },
+          {
+            "op": "add",
+            "path": "/ui/components/cmp_k_metric_revenue/mounts/-",
+            "value": { "messageId": "msg_1", "slot": "inline", "order": 1 }
+          }
+        ],
+        "createdComponentIds": ["cmp_k_metric_revenue"],
+        "warnings": [],
+        "keyMap": { "k_metric_revenue": "cmp_k_metric_revenue" }
+      }
+    },
+    {
+      "id": "update_props_increments_revision",
+      "threadId": "t1",
+      "initialSharedState": {
+        "ui": {
+          "v": 1,
+          "components": {
+            "cmp_k_metric_revenue": {
+              "type": "MetricCard",
+              "schemaVersion": 1,
+              "props": { "label": "Revenue", "value": 128430, "unit": "USD" },
+              "revision": 0,
+              "mounts": []
+            }
+          }
+        }
+      },
+      "initialKeyMap": { "k_metric_revenue": "cmp_k_metric_revenue" },
+      "input": {
+        "v": 1,
+        "ops": [
+          {
+            "op": "update",
+            "key": "k_metric_revenue",
+            "props": { "label": "Revenue", "value": 129001, "unit": "USD" }
+          }
+        ]
+      },
+      "expect": {
+        "patchOps": [
+          {
+            "op": "add",
+            "path": "/ui/components/cmp_k_metric_revenue/props",
+            "value": { "label": "Revenue", "value": 129001, "unit": "USD" }
+          },
+          {
+            "op": "replace",
+            "path": "/ui/components/cmp_k_metric_revenue/revision",
+            "value": 1
+          }
+        ],
+        "createdComponentIds": [],
+        "warnings": [],
+        "keyMap": { "k_metric_revenue": "cmp_k_metric_revenue" }
+      }
+    },
+    {
+      "id": "unmount_replaces_mounts",
+      "threadId": "t1",
+      "initialSharedState": {
+        "ui": {
+          "v": 1,
+          "components": {
+            "cmp_k_metric_revenue": {
+              "type": "MetricCard",
+              "schemaVersion": 1,
+              "props": { "label": "Revenue", "value": 128430, "unit": "USD" },
+              "revision": 0,
+              "mounts": [{ "messageId": "msg_1", "slot": "inline", "order": 1 }]
+            }
+          }
+        }
+      },
+      "initialKeyMap": { "k_metric_revenue": "cmp_k_metric_revenue" },
+      "input": {
+        "v": 1,
+        "ops": [
+          {
+            "op": "unmount",
+            "key": "k_metric_revenue",
+            "messageId": "msg_1",
+            "slot": "inline"
+          }
+        ]
+      },
+      "expect": {
+        "patchOps": [
+          {
+            "op": "replace",
+            "path": "/ui/components/cmp_k_metric_revenue/mounts",
+            "value": []
+          }
+        ],
+        "createdComponentIds": [],
+        "warnings": [],
+        "keyMap": { "k_metric_revenue": "cmp_k_metric_revenue" }
+      }
+    },
+    {
+      "id": "remove_replaces_components_and_resets_keymap",
+      "threadId": "t1",
+      "initialSharedState": {
+        "ui": {
+          "v": 1,
+          "components": {
+            "cmp_k_metric_revenue": {
+              "type": "MetricCard",
+              "schemaVersion": 1,
+              "props": { "label": "Revenue", "value": 128430, "unit": "USD" },
+              "revision": 0,
+              "mounts": []
+            }
+          }
+        }
+      },
+      "initialKeyMap": { "k_metric_revenue": "cmp_k_metric_revenue" },
+      "input": {
+        "v": 1,
+        "ops": [
+          {
+            "op": "remove",
+            "key": "k_metric_revenue"
+          }
+        ]
+      },
+      "expect": {
+        "patchOps": [
+          {
+            "op": "replace",
+            "path": "/ui/components",
+            "value": {}
+          }
+        ],
+        "createdComponentIds": [],
+        "warnings": [],
+        "keyMap": {}
+      }
+    }
+  ]
+}

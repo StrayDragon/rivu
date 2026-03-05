@@ -81,6 +81,33 @@ pub fn set_component_v1(component_id: &str, component: Value) -> Vec<Value> {
     })]
 }
 
+pub fn delete_component_v1(shared_state: &Value, component_id: &str) -> Result<Vec<Value>, UiSpecError> {
+    if component_id.trim().is_empty() {
+        return Err(UiSpecError::ValidationError("componentId must be non-empty".into()));
+    }
+
+    let Some(components) = shared_state
+        .get("ui")
+        .and_then(|ui| ui.get("components"))
+        .and_then(|c| c.as_object())
+    else {
+        return Ok(vec![]);
+    };
+
+    if !components.contains_key(component_id) {
+        return Ok(vec![]);
+    }
+
+    let mut next = components.clone();
+    next.remove(component_id);
+
+    Ok(vec![json!({
+        "op": "replace",
+        "path": "/ui/components",
+        "value": Value::Object(next),
+    })])
+}
+
 pub fn unmount_component_v1(mounts: &[UiMountV1], component_id: &str, message_id: &str, slot: &str) -> Vec<Value> {
     let next_mounts: Vec<Value> = mounts
         .iter()
