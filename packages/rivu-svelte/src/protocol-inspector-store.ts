@@ -8,7 +8,16 @@ type OutboxSummary = {
   pending: number;
   acked: number;
   failed: number;
-  entries: Array<Pick<OutboxEntry, 'clientRequestId' | 'status' | 'createdAtMs' | 'ackedAtMs' | 'failedAtMs'>>;
+  entries: Array<{
+    clientRequestId: string;
+    status: OutboxEntry['status'];
+    createdAtMs: number;
+    attemptCount: number;
+    lastAttemptAtMs: number;
+    ackedAtMs: number | null;
+    failedAtMs: number | null;
+    errorMessage: string | null;
+  }>;
 };
 
 type UiSummary =
@@ -40,6 +49,17 @@ export type ProtocolInspectorStoreOptions = {
   maxUiComponents?: number;
 };
 
+function formatOutboxError(error: unknown): string {
+  if (!error) return '';
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 function summarizeOutbox(outbox: Record<string, OutboxEntry>, maxOutboxEntries: number): OutboxSummary {
   const entries = Object.values(outbox);
   let pending = 0;
@@ -52,14 +72,17 @@ function summarizeOutbox(outbox: Record<string, OutboxEntry>, maxOutboxEntries: 
   }
 
   const recent = [...entries]
-    .sort((a, b) => b.createdAtMs - a.createdAtMs)
+    .sort((a, b) => b.lastAttemptAtMs - a.lastAttemptAtMs)
     .slice(0, maxOutboxEntries)
     .map((e) => ({
       clientRequestId: e.clientRequestId,
       status: e.status,
       createdAtMs: e.createdAtMs,
+      attemptCount: e.attemptCount,
+      lastAttemptAtMs: e.lastAttemptAtMs,
       ackedAtMs: e.ackedAtMs,
       failedAtMs: e.failedAtMs,
+      errorMessage: e.error ? formatOutboxError(e.error) : null,
     }));
 
   return { total: entries.length, pending, acked, failed, entries: recent };

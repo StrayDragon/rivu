@@ -45,6 +45,7 @@ export function createMockServer(params: {
   let seq = 0;
   let sharedState: Record<string, unknown> = structuredClone(params.initialSharedState);
   const idempotency = new Map<string, ProcessResult>();
+  let failNextApprovalOnce = true;
 
   const emit = (event: unknown) => {
     seq += 1;
@@ -165,6 +166,14 @@ export function createMockServer(params: {
   };
 
   const actionTransport = async (action: UiV1CustomEvent) => {
+    if (
+      failNextApprovalOnce &&
+      action.value.componentId === 'cmp_approval' &&
+      action.value.eventName === 'approve'
+    ) {
+      failNextApprovalOnce = false;
+      throw new Error('DEMO_NETWORK_FAIL_ONCE: simulated transport failure (use outbox retry)');
+    }
     const result = processUiV1Event(action);
     emit({ type: 'STATE_DELTA', delta: result.patch });
   };
@@ -181,4 +190,3 @@ export function createMockServer(params: {
     getSharedState: () => sharedState,
   };
 }
-

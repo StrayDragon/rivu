@@ -38,6 +38,8 @@ export type OutboxEntry = {
   status: 'pending' | 'acked' | 'failed';
   action: UiV1CustomEvent;
   createdAtMs: number;
+  attemptCount: number;
+  lastAttemptAtMs: number;
   ackedAtMs: number | null;
   failedAtMs: number | null;
   error: unknown | null;
@@ -68,6 +70,21 @@ export type SendResult =
   | { status: 'sent'; clientRequestId: string }
   | { status: 'duplicate'; clientRequestId: string };
 
+export type RetryResult =
+  | SendResult
+  | { status: 'not_found'; clientRequestId: string }
+  | { status: 'not_failed'; clientRequestId: string; currentStatus: 'pending' | 'acked' };
+
+export type ClearOutboxOptions = {
+  keepLastN?: number;
+};
+
+export type ClearOutboxResult = {
+  status: 'cleared';
+  removed: number;
+  kept: number;
+};
+
 export type RivuKernelActionTransport = (action: UiV1CustomEvent) => Promise<void>;
 
 export type RivuKernel = {
@@ -75,6 +92,8 @@ export type RivuKernel = {
   getState: () => RivuKernelState;
   subscribe: (listener: () => void) => () => void;
   send: (action: UiV1CustomEvent) => Promise<SendResult>;
+  retry: (clientRequestId: string) => Promise<RetryResult>;
+  clearOutbox: (options?: ClearOutboxOptions) => ClearOutboxResult;
 };
 
 export type CreateKernelOptions = {
@@ -475,6 +494,8 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
       status: 'pending',
       action: parsed.data,
       createdAtMs,
+      attemptCount: 1,
+      lastAttemptAtMs: createdAtMs,
       ackedAtMs: null,
       failedAtMs: null,
       error: null,
@@ -519,6 +540,101 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
     return promise;
   }
 
+  async function retry(clientRequestId: string): Promise<RetryResult> {
+    const existingPromise = sendPromisesByRequestId.get(clientRequestId);
+    if (existingPromise) return existingPromise;
+
+    const existingEntry = state.outbox[clientRequestId];
+    if (!existingEntry) return { status: 'not_found', clientRequestId };
+    if (existingEntry.status !== 'failed') {
+      return { status: 'not_failed', clientRequestId, currentStatus: existingEntry.status };
+    }
+
+    if (!actionTransport) {
+      throw new Error('actionTransport is not configured');
+    }
+
+    const parsed = uiV1CustomEventSchema.safeParse(existingEntry.action);
+    if (!parsed.success) {
+      throw parsed.error;
+    }
+
+    const attemptAtMs = nowMs();
+    const nextEntry: OutboxEntry = {
+      ...existingEntry,
+      status: 'pending',
+      action: parsed.data,
+      attemptCount: existingEntry.attemptCount + 1,
+      lastAttemptAtMs: attemptAtMs,
+      ackedAtMs: null,
+      failedAtMs: null,
+      error: null,
+    };
+
+    setState({ ...state, outbox: { ...state.outbox, [clientRequestId]: nextEntry } });
+
+    const promise = actionTransport(parsed.data)
+      .then(() => {
+        const ackedAtMs = nowMs();
+        const current = state.outbox[clientRequestId];
+        if (current && current.status === 'pending') {
+          setState({
+            ...state,
+            outbox: {
+              ...state.outbox,
+              [clientRequestId]: { ...current, status: 'acked', ackedAtMs, failedAtMs: null, error: null },
+            },
+          });
+        }
+        return { status: 'sent', clientRequestId } as const;
+      })
+      .catch((error) => {
+        const failedAtMs = nowMs();
+        const current = state.outbox[clientRequestId];
+        if (current && current.status === 'pending') {
+          setState({
+            ...state,
+            outbox: {
+              ...state.outbox,
+              [clientRequestId]: { ...current, status: 'failed', failedAtMs, error },
+            },
+          });
+        }
+        throw error;
+      })
+      .finally(() => {
+        sendPromisesByRequestId.delete(clientRequestId);
+      });
+
+    sendPromisesByRequestId.set(clientRequestId, promise);
+    return promise;
+  }
+
+  function clearOutbox(options: ClearOutboxOptions = {}): ClearOutboxResult {
+    const keepLastN = options.keepLastN ?? 0;
+    const entries = Object.values(state.outbox);
+
+    if (keepLastN <= 0) {
+      const removed = entries.length;
+      if (removed > 0) {
+        setState({ ...state, outbox: {} });
+      }
+      return { status: 'cleared', removed, kept: 0 };
+    }
+
+    const sorted = [...entries].sort((a, b) => b.lastAttemptAtMs - a.lastAttemptAtMs);
+    const keep = sorted.slice(0, keepLastN);
+    if (keep.length === entries.length) return { status: 'cleared', removed: 0, kept: keep.length };
+
+    const nextOutbox: Record<string, OutboxEntry> = {};
+    for (const entry of keep) {
+      nextOutbox[entry.clientRequestId] = state.outbox[entry.clientRequestId]!;
+    }
+    setState({ ...state, outbox: nextOutbox });
+
+    return { status: 'cleared', removed: entries.length - keep.length, kept: keep.length };
+  }
+
   return {
     dispatch,
     getState: () => state,
@@ -527,5 +643,7 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
       return () => listeners.delete(listener);
     },
     send,
+    retry,
+    clearOutbox,
   };
 }

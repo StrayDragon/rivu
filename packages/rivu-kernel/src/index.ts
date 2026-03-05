@@ -1,6 +1,9 @@
 export type {
+  ClearOutboxOptions,
+  ClearOutboxResult,
   DispatchResult,
   OutboxEntry,
+  RetryResult,
   RivuEnvelope,
   RivuKernel,
   RivuKernelActionTransport,

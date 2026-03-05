@@ -555,6 +555,7 @@ function WorkflowSection(props: { kernel: RivuKernel; host: ReturnType<typeof cr
       <div className="hint" style={{ lineHeight: 1.55 }}>
         Workflow components are <b>stateful</b>: UI interactions send <code>ui.v1.event</code> with <code>clientRequestId</code> +{' '}
         <code>baseRevision</code>, and the server commits updates via <code>STATE_DELTA</code>.
+        {' '}Demo: the first <code>FormCard</code> submit simulates a transport failure; use <code>ProtocolInspector</code> outbox retry to re-send the failed <code>clientRequestId</code>.
       </div>
 
       <div className="exampleGrid">

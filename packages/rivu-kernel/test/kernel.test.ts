@@ -173,3 +173,109 @@ test('send: deduplicates by clientRequestId and updates outbox status', async ()
   const r3 = await kernel.send(action);
   expect(r3).toEqual({ status: 'duplicate', clientRequestId: 'req_1' });
 });
+
+test('send: failed transport transitions outbox to failed and surfaces error', async () => {
+  let now = 1000;
+  const nowMs = () => ++now;
+  const err = new Error('network down');
+  const transport = vi.fn(async () => {
+    throw err;
+  });
+  const kernel = createKernel({ actionTransport: transport, nowMs });
+
+  const action = {
+    type: 'CUSTOM',
+    name: 'ui.v1.event',
+    value: {
+      componentId: 'cmp_1',
+      eventName: 'submit',
+      payload: {},
+      clientRequestId: 'req_fail',
+      baseRevision: 0,
+    },
+  } as const;
+
+  await expect(kernel.send(action)).rejects.toThrow('network down');
+
+  expect(kernel.getState().outbox.req_fail).toEqual({
+    clientRequestId: 'req_fail',
+    status: 'failed',
+    action,
+    createdAtMs: 1001,
+    attemptCount: 1,
+    lastAttemptAtMs: 1001,
+    ackedAtMs: null,
+    failedAtMs: 1002,
+    error: err,
+  });
+
+  const r2 = await kernel.send(action);
+  expect(r2).toEqual({ status: 'duplicate', clientRequestId: 'req_fail' });
+  expect(transport).toHaveBeenCalledTimes(1);
+});
+
+test('retry: re-sends failed entry and updates attempt state', async () => {
+  let now = 2000;
+  const nowMs = () => ++now;
+  const err = new Error('flaky');
+
+  const transport = vi.fn(async () => {
+    if (transport.mock.calls.length === 1) throw err;
+  });
+
+  const kernel = createKernel({ actionTransport: transport, nowMs });
+
+  const action = {
+    type: 'CUSTOM',
+    name: 'ui.v1.event',
+    value: {
+      componentId: 'cmp_1',
+      eventName: 'submit',
+      payload: {},
+      clientRequestId: 'req_retry',
+      baseRevision: 0,
+    },
+  } as const;
+
+  await expect(kernel.send(action)).rejects.toThrow('flaky');
+  expect(kernel.getState().outbox.req_retry?.status).toBe('failed');
+  expect(kernel.getState().outbox.req_retry?.attemptCount).toBe(1);
+
+  const r2 = await kernel.retry('req_retry');
+  expect(r2).toEqual({ status: 'sent', clientRequestId: 'req_retry' });
+  expect(transport).toHaveBeenCalledTimes(2);
+
+  const entry = kernel.getState().outbox.req_retry!;
+  expect(entry.status).toBe('acked');
+  expect(entry.attemptCount).toBe(2);
+  expect(entry.createdAtMs).toBe(2001);
+  expect(entry.lastAttemptAtMs).toBe(2003);
+  expect(entry.ackedAtMs).toBe(2004);
+  expect(entry.failedAtMs).toBe(null);
+  expect(entry.error).toBe(null);
+});
+
+test('retry: returns not_found / not_failed without invoking transport', async () => {
+  const transport = vi.fn(async () => {});
+  const kernel = createKernel({ actionTransport: transport });
+
+  const missing = await kernel.retry('req_missing');
+  expect(missing).toEqual({ status: 'not_found', clientRequestId: 'req_missing' });
+
+  const action = {
+    type: 'CUSTOM',
+    name: 'ui.v1.event',
+    value: {
+      componentId: 'cmp_1',
+      eventName: 'submit',
+      payload: {},
+      clientRequestId: 'req_acked',
+      baseRevision: 0,
+    },
+  } as const;
+
+  await kernel.send(action);
+  const notFailed = await kernel.retry('req_acked');
+  expect(notFailed).toEqual({ status: 'not_failed', clientRequestId: 'req_acked', currentStatus: 'acked' });
+  expect(transport).toHaveBeenCalledTimes(1);
+});

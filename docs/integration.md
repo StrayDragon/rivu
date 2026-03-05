@@ -49,9 +49,48 @@ const kernel = createKernel({
 
 kernel.dispatch({ seq, event });   // server envelopes
 kernel.send(uiV1CustomEvent);      // client actions (ui.v1.event)
+kernel.retry(clientRequestId);     // retry a previously failed send
 kernel.getState();                 // lastSeq, sharedState, messages, toolCalls, outbox…
 kernel.subscribe(() => { /* rerender */ });
 ```
+
+## Outbox retry semantics
+
+- `send(action)` is **idempotent by `clientRequestId`**:
+  - while a send is in-flight, duplicate `send()` calls share the same promise and only one transport is invoked
+  - after a send is `acked` or `failed`, calling `send()` again with the same `clientRequestId` returns `{ status: "duplicate" }`
+- `retry(clientRequestId)` is the explicit escape hatch for failures:
+  - only retries `status="failed"` entries (returns `{ status: "not_failed" }` for `pending/acked`, `{ status: "not_found" }` if missing)
+  - reuses the same `clientRequestId` and re-invokes your `actionTransport`
+
+**Server requirement:** your backend MUST treat `clientRequestId` as an idempotency key (dedupe/ignore duplicates). This is what makes retries safe.
+
+Example:
+
+```ts
+const clientRequestId = uiV1CustomEvent.value.clientRequestId;
+
+// send() throws on transport errors
+try {
+  const r1 = await kernel.send(uiV1CustomEvent);
+  if (r1.status === 'duplicate') return;
+} catch {
+  const r2 = await kernel.retry(clientRequestId);
+  if (r2.status === 'sent') {
+    // wait for server envelopes; do not mutate sharedState locally
+  }
+}
+```
+
+### Outbox cleanup (optional)
+
+Long-running sessions may want to bound outbox growth:
+
+```ts
+kernel.clearOutbox({ keepLastN: 200 });
+```
+
+Clearing outbox entries removes the kernel’s local dedupe memory for those `clientRequestId`s (your backend idempotency should still make replays safe).
 
 ### `seq` rules (fail-fast)
 

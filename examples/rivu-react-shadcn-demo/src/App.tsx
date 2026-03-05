@@ -148,7 +148,9 @@ export function App() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm font-extrabold">Chat embeds</div>
-                <div className="mt-1 text-xs text-muted-foreground">Inline mounts render inside message cards. Click to change sidebar.</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Inline mounts render inside message cards. Click to change sidebar. Demo: the first ApprovalCard approve simulates a transport failure; retry via ProtocolInspector outbox.
+                </div>
               </div>
               <Badge variant="secondary">mounts: inline / sidebar</Badge>
             </div>
