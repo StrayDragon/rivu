@@ -23,6 +23,9 @@
     "react-dom": ">=19"
   },
   "dependencies": {
+    "d3-array": "^3.2.4",
+    "d3-scale": "^4.0.2",
+    "d3-shape": "^3.2.0",
     "rivu-kernel": "workspace:*",
     "rivu-ui-spec": "workspace:*",
     "zod": "^4.3.6"

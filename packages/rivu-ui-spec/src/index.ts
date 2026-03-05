@@ -6,6 +6,9 @@ export { uiComponentV1Schema, uiMountV1Schema, uiStateV1Schema } from './state-u
 export type { UiDataRefV1, UiDatasetV1 } from './ui-datasets.js';
 export { uiDataRefV1Schema, uiDatasetV1Schema } from './ui-datasets.js';
 
+export type { ChartEncodingV1, ChartMarkV1, ChartOptionsV1, ChartPropsV1 } from './ui-chart.js';
+export { chartEncodingV1Schema, chartMarkV1Schema, chartOptionsV1Schema, chartPropsV1Schema } from './ui-chart.js';
+
 export type { UiV1CustomEvent, UiV1EventValue } from './ui-v1-event.js';
 export {
   UI_V1_EVENT_NAME,
@@ -36,6 +39,7 @@ export {
   uiStateV1JsonSchema,
   uiDatasetV1JsonSchema,
   uiDataRefV1JsonSchema,
+  chartPropsV1JsonSchema,
   uiInputLimitsV1JsonSchema,
   uiV1CustomEventJsonSchema,
   uiV1EventValueJsonSchema,

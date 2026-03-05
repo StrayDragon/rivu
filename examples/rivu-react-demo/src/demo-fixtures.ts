@@ -95,6 +95,26 @@ export function createInitialSharedState() {
           revision: 0,
           mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 5 }],
         },
+        cmp_chart: {
+          type: 'Chart',
+          schemaVersion: 1,
+          props: {
+            mark: 'pie',
+            data: {
+              columns: ['label', 'value'],
+              rows: [
+                ['Search', 34_200],
+                ['Referral', 21_100],
+                ['Direct', 17_800],
+                ['Email', 9_400],
+              ],
+            },
+            encoding: { label: 'label', value: 'value' },
+            options: { title: 'Chart (v1 pie)', unit: 'USD', height: 240 },
+          },
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 6 }],
+        },
         cmp_error_demo: {
           type: 'MetricCard',
           schemaVersion: 1,

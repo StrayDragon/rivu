@@ -11,15 +11,17 @@ The repository MUST include a runnable React demo under `examples/` that depends
 - **THEN** a Vite dev server starts successfully without requiring external services
 
 ### Requirement: Demo renders all v1 MVP components
-The demo MUST render all v1 MVP component types from the official registries.
+仓库 MUST 在 `examples/` 下包含一个可运行的 React demo，并通过 workspace 依赖引用 `rivu-kernel` 与 `rivu-react`。
+
+demo MUST 从官方 registry 中渲染所有 v1 MVP 组件类型。
 
 #### Scenario: Viewer components visible
-- **WHEN** the demo loads the initial `STATE_SNAPSHOT`
-- **THEN** `ReportSection`, `MetricCard`, `DataTable`, `BarChart`, `LineChart`, and `CitationList` are rendered
+- **WHEN** demo 加载初始 `STATE_SNAPSHOT`
+- **THEN** 会渲染 `ReportSection`, `MetricCard`, `DataTable`, `Chart`, `BarChart`, `LineChart`, `CitationList`
 
 #### Scenario: Workflow components visible
-- **WHEN** the demo loads the initial `STATE_SNAPSHOT`
-- **THEN** `ApprovalCard` and `FormCard` are rendered
+- **WHEN** demo 加载初始 `STATE_SNAPSHOT`
+- **THEN** 会渲染 `ApprovalCard` 与 `FormCard`
 
 ### Requirement: Demo demonstrates mounts embedding
 The demo MUST demonstrate `state.ui.components[componentId].mounts` embedding using PRD slots `inline | sidebar`.

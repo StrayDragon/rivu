@@ -41,6 +41,71 @@ test('Viewer component props validate and render (MetricCard)', () => {
   expect(screen.getByText(/1[, ]?234/)).toBeTruthy();
 });
 
+test('Viewer component props validate and render (Chart empty state)', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_chart: {
+              type: 'Chart',
+              schemaVersion: 1,
+              props: {
+                mark: 'bar',
+                data: { columns: ['x', 'y'], rows: [] },
+                encoding: { x: 'x', y: 'y' },
+                options: { title: 'Chart (empty)', unit: 'USD', height: 220 },
+              },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} registry={createRegistry(viewerRegistryV1)} componentId="cmp_chart" />);
+
+  expect(screen.getByText('Chart (empty)')).toBeTruthy();
+  expect(screen.getByText('No data')).toBeTruthy();
+});
+
+test('Viewer component degrades to UnknownComponentCard on invalid Chart props', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_chart: {
+              type: 'Chart',
+              schemaVersion: 1,
+              props: {
+                mark: 'bar',
+                data: { columns: ['x', 'y'], rows: [['Search', 10]] },
+                encoding: { x: 'x' },
+              },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} registry={createRegistry(viewerRegistryV1)} componentId="cmp_chart" />);
+  expect(screen.getByText('Invalid component props')).toBeTruthy();
+});
+
 test('ApprovalCard emits ui.v1.event approve with baseRevision', async () => {
   const actions: any[] = [];
   const kernel = createKernel({

@@ -7,6 +7,8 @@ import { uiDataRefV1Schema } from 'rivu-ui-spec';
 
 import type { RivuComponentRegistration, RivuComponentRegistry } from '../registry.js';
 import { UnknownComponentCard } from '../unknown-component-card.js';
+export { CHART_COMPONENT_TYPE, CHART_SCHEMA_VERSION, chartRegistrationV1, Chart } from './chart.js';
+import { CHART_COMPONENT_TYPE, chartRegistrationV1 } from './chart.js';
 
 const theme = {
   bg: 'var(--rivu-bg, #fff)',
@@ -521,6 +523,7 @@ export const viewerRegistryV1 = {
   [REPORT_SECTION_COMPONENT_TYPE]: reportSectionRegistrationV1,
   [METRIC_CARD_COMPONENT_TYPE]: metricCardRegistrationV1,
   [DATA_TABLE_COMPONENT_TYPE]: dataTableRegistrationV1,
+  [CHART_COMPONENT_TYPE]: chartRegistrationV1,
   [BAR_CHART_COMPONENT_TYPE]: barChartRegistrationV1,
   [LINE_CHART_COMPONENT_TYPE]: lineChartRegistrationV1,
   [CITATION_LIST_COMPONENT_TYPE]: citationListRegistrationV1,

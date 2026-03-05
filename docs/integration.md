@@ -164,9 +164,29 @@ Component types:
 - `ReportSection` (`schemaVersion: 1`) — props: `{ title, description? }`
 - `MetricCard` (`schemaVersion: 1`) — props: `{ label, value, unit?, changePercent?, note? }`
 - `DataTable` (`schemaVersion: 1`) — props: `{ caption?, columns[], rows[] }`
+- `Chart` (`schemaVersion: 1`) — props: `{ mark, data:{ columns[], rows[] }, encoding, options? }` (recommended, token-efficient)
 - `BarChart` (`schemaVersion: 1`) — props: `{ title?, unit?, items[] }`
 - `LineChart` (`schemaVersion: 1`) — props: `{ title?, unit?, points[] }`
 - `CitationList` (`schemaVersion: 1`) — props: `{ title?, items[] }` (unsafe/invalid URLs are blocked)
+
+Notes:
+- Prefer `Chart` for new integrations and A2UI generation. `BarChart` / `LineChart` remain as compatibility components for existing snapshots.
+- `Chart.data` uses `columns + rows` to reduce repeated keys. Keep `columns` short and map fields explicitly via `encoding` for validation and replay.
+
+Minimal `Chart` example:
+
+```json
+{
+  "type": "Chart",
+  "schemaVersion": 1,
+  "props": {
+    "mark": "bar",
+    "data": { "columns": ["channel", "revenue"], "rows": [["Search", 34200], ["Email", 9400]] },
+    "encoding": { "x": "channel", "y": "revenue" },
+    "options": { "title": "Revenue by channel", "unit": "USD" }
+  }
+}
+```
 
 Example `sharedState.ui` component entry:
 
