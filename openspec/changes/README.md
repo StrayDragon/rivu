@@ -13,7 +13,6 @@ Legacy PRD（`PRD.md`）退役前后的章节映射与入口索引见：
 
 ## Active changes（待实现 / 进行中）
 
-- `ui-thread-toolkit-v1` — 可选 Thread UI Kit（Layer 2）+ ToolCards primitives（Layer 1.5）。
 - `workflow-cards-confirm-task-status-v1` — `ConfirmCard` + `TaskStatusCard`（workflow 常见 P0 交互补齐）。
 - `viewer-pivottable-heatmap-v1` — Viewer P1：`PivotTable` + `Heatmap`（datasets + export-friendly）。
 - `viewer-diff-view-v1` — Viewer P1：`DiffView`（before/after 差异展示，确定性导出）。

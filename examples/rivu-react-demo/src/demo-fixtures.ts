@@ -241,5 +241,11 @@ export function createBootstrapEnvelopes(sharedState: Record<string, unknown>): 
     { seq: 8, event: { type: 'TEXT_MESSAGE_START', messageId: DEMO_MESSAGE_IDS.assistant2, role: 'assistant' } },
     { seq: 9, event: { type: 'TEXT_MESSAGE_CHUNK', messageId: DEMO_MESSAGE_IDS.assistant2, role: 'assistant', delta: 'Next, try the workflow components below (server-authoritative state via ui.v1.event).' } },
     { seq: 10, event: { type: 'TEXT_MESSAGE_END', messageId: DEMO_MESSAGE_IDS.assistant2 } },
+    { seq: 11, event: { type: 'TOOL_CALL_START', toolCallId: 'tool_call_1', toolCallName: 'getRevenue', parentMessageId: DEMO_MESSAGE_IDS.assistant1 } },
+    { seq: 12, event: { type: 'TOOL_CALL_ARGS', toolCallId: 'tool_call_1', delta: '{\n  \"region\": \"NA\"\n}' } },
+    { seq: 13, event: { type: 'TOOL_CALL_END', toolCallId: 'tool_call_1' } },
+    { seq: 14, event: { type: 'TOOL_CALL_RESULT', messageId: 'msg_tool_1', toolCallId: 'tool_call_1', content: '{\"ok\":true,\"revenue\":128430}' } },
+    { seq: 15, event: { type: 'TOOL_CALL_START', toolCallId: 'tool_call_stream', toolCallName: 'searchDocs', parentMessageId: DEMO_MESSAGE_IDS.assistant2 } },
+    { seq: 16, event: { type: 'TOOL_CALL_ARGS', toolCallId: 'tool_call_stream', delta: '{\n  \"query\": \"Thread UI Kit\"\n' } },
   ];
 }

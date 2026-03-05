@@ -14,6 +14,7 @@ import {
   DATA_TABLE_COMPONENT_TYPE,
   DataTable,
   ProtocolInspector,
+  ThreadView,
   UnknownComponentCard,
   buildUiV1Capabilities,
   createClientRequestId,
@@ -43,6 +44,7 @@ type SectionId =
   | 'export'
   | 'compaction'
   | 'chat'
+  | 'threadKit'
   | 'docs';
 
 const SECTIONS: Array<{ id: SectionId; label: string; description: string }> = [
@@ -55,6 +57,7 @@ const SECTIONS: Array<{ id: SectionId; label: string; description: string }> = [
   { id: 'export', label: 'Export', description: 'Export snapshot → HTML + SVG assets (deterministic/offline).' },
   { id: 'compaction', label: 'Compaction', description: 'Server-side event compaction simulation (chunks + snapshot tuning).' },
   { id: 'chat', label: 'Chat Layout', description: 'Mounts into messages: inline vs sidebar slots.' },
+  { id: 'threadKit', label: 'Thread UI Kit', description: 'Optional Layer 2: messages + tool cards + mounts + run status.' },
   { id: 'docs', label: 'Docs', description: 'Where the matching guides live in this repo.' },
 ];
 
@@ -1012,6 +1015,53 @@ function ChatSection(props: {
   );
 }
 
+function ThreadKitSection(props: { kernel: RivuKernel; registry: ReturnType<typeof createRegistry>; host: ReturnType<typeof createHost> }) {
+  const simulateGap = () => {
+    const s = props.kernel.getState();
+    props.kernel.dispatch({
+      seq: s.lastSeq + 2,
+      event: { type: 'TEXT_MESSAGE_CHUNK', messageId: DEMO_MESSAGE_IDS.assistant2, role: 'assistant', delta: ' (simulated gap)' },
+    });
+  };
+
+  const simulatePatchError = () => {
+    const s = props.kernel.getState();
+    props.kernel.dispatch({
+      seq: s.lastSeq + 1,
+      event: { type: 'STATE_DELTA', delta: [{ op: 'replace', path: '/ui/components/missing', value: 1 }] },
+    });
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="hint" style={{ lineHeight: 1.55 }}>
+        Thread UI Kit is an <b>optional</b> Layer 2 wrapper: it renders messages, tool calls/results, mounts, and kernel run status without any Provider
+        or network coupling.
+      </div>
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button className="btn" type="button" onClick={simulateGap}>
+          Simulate seq gap
+        </button>
+        <button className="btn" type="button" onClick={simulatePatchError}>
+          Simulate patch error
+        </button>
+        <div className="hint" style={{ alignSelf: 'center' }}>
+          Use <b>Reset</b> to restore a clean run.
+        </div>
+      </div>
+
+      <ThreadView
+        kernel={props.kernel}
+        registry={props.registry}
+        renderHooks={props.host.renderHooks}
+        slotProps={props.host.slotProps}
+        sidebar
+      />
+    </div>
+  );
+}
+
 export function App() {
   const registry = useMemo(
     () =>
@@ -1295,6 +1345,7 @@ export function App() {
             {section === 'chat' ? (
               <ChatSection kernel={kernel} host={host} selectedMessageId={selectedMessageId} onSelectMessageId={setSelectedMessageId} />
             ) : null}
+            {section === 'threadKit' ? <ThreadKitSection kernel={kernel} registry={registry} host={host} /> : null}
             {section === 'docs' ? <DocsSection /> : null}
           </div>
         </div>

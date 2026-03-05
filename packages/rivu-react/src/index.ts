@@ -40,3 +40,7 @@ export { exportPdfV1 } from './viewer-export-pdf.js';
 
 export * from './ui-kit/viewer.js';
 export * from './ui-kit/workflow.js';
+
+// Optional Layer 2 (Thread UI Kit) + Layer 1.5 (ToolCards)
+export * from './tool-cards/index.js';
+export * from './thread-kit/index.js';

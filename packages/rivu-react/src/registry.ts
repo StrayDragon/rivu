@@ -35,8 +35,8 @@ export function createRegistry(registry: RivuComponentRegistry): RivuComponentRe
 
 export function createHost(params: {
   registry: RivuComponentRegistry;
-  renderHooks?: Partial<RivuRenderHooks>;
-  slotProps?: RivuSlotProps;
+  renderHooks?: Partial<RivuRenderHooks> | undefined;
+  slotProps?: RivuSlotProps | undefined;
 }): RivuHost {
   return {
     registry: params.registry,
