@@ -20,6 +20,28 @@ export function createInitialSharedState() {
             ['Email', 9_400],
           ],
         },
+        ds_sales_by_region: {
+          columns: ['region', 'quarter', 'revenue'],
+          rows: [
+            ['APAC', 'Q1', 10_200],
+            ['APAC', 'Q2', 14_800],
+            ['APAC', 'Q3', 9_600],
+            ['EU', 'Q1', 7_900],
+            ['EU', 'Q2', 12_100],
+            ['NA', 'Q1', 8_500],
+          ],
+        },
+        ds_latency_heatmap: {
+          columns: ['bucket', 'endpoint', 'p95_ms'],
+          rows: [
+            ['0-50', '/api/a', 12],
+            ['50-100', '/api/a', 62],
+            ['100-200', '/api/a', 145],
+            ['0-50', '/api/b', 18],
+            ['50-100', '/api/b', 74],
+            ['100-200', '/api/b', 166],
+          ],
+        },
       },
       components: {
         cmp_report_section: {
@@ -114,6 +136,31 @@ export function createInitialSharedState() {
           },
           revision: 0,
           mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 6 }],
+        },
+        cmp_pivot_table: {
+          type: 'PivotTable',
+          schemaVersion: 1,
+          props: {
+            dataRef: { datasetId: 'ds_sales_by_region' },
+            rows: ['region'],
+            columns: 'quarter',
+            value: 'revenue',
+            agg: 'sum',
+            options: { title: 'PivotTable (dataset demo)', unit: 'USD', showTotals: true },
+          },
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 7 }],
+        },
+        cmp_heatmap: {
+          type: 'Heatmap',
+          schemaVersion: 1,
+          props: {
+            dataRef: { datasetId: 'ds_latency_heatmap' },
+            encoding: { x: 'bucket', y: 'endpoint', value: 'p95_ms' },
+            options: { title: 'Heatmap (dataset demo)', unit: 'ms', height: 240 },
+          },
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 8 }],
         },
         cmp_error_demo: {
           type: 'MetricCard',

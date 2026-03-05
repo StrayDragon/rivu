@@ -143,6 +143,96 @@ test('Viewer component degrades to UnknownComponentCard on invalid Chart props',
   expect(screen.getByText('Invalid component props')).toBeTruthy();
 });
 
+test('PivotTable aggregates deterministically (sum + totals)', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          datasets: {
+            ds_sales: {
+              columns: ['region', 'quarter', 'revenue'],
+              rows: [
+                ['APAC', 'Q1', 10],
+                ['APAC', 'Q1', 5],
+                ['APAC', 'Q2', 20],
+                ['EU', 'Q1', 7],
+              ],
+            },
+          },
+          components: {
+            cmp_pivot: {
+              type: 'PivotTable',
+              schemaVersion: 1,
+              props: {
+                dataRef: { datasetId: 'ds_sales' },
+                rows: ['region'],
+                columns: 'quarter',
+                value: 'revenue',
+                agg: 'sum',
+                options: { title: 'Revenue Pivot', showTotals: true },
+              },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} host={viewerHost} componentId="cmp_pivot" />);
+
+  expect(screen.getByText('Revenue Pivot')).toBeTruthy();
+  expect(screen.getByText('APAC')).toBeTruthy();
+  expect(screen.getByText('EU')).toBeTruthy();
+  expect(screen.getByText('Q1')).toBeTruthy();
+  expect(screen.getByText('Q2')).toBeTruthy();
+  expect(screen.getAllByText('15').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('20').length).toBeGreaterThan(0);
+  expect(screen.getAllByText('7').length).toBeGreaterThan(0);
+});
+
+test('Heatmap rejects non-numeric values in encoding.value column', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          datasets: {
+            ds_latency: {
+              columns: ['bucket', 'endpoint', 'p95_ms'],
+              rows: [['0-50', '/api/a', 'bad']],
+            },
+          },
+          components: {
+            cmp_heatmap: {
+              type: 'Heatmap',
+              schemaVersion: 1,
+              props: {
+                dataRef: { datasetId: 'ds_latency' },
+                encoding: { x: 'bucket', y: 'endpoint', value: 'p95_ms' },
+              },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} host={viewerHost} componentId="cmp_heatmap" />);
+
+  expect(screen.getByText('Heatmap value must be numeric')).toBeTruthy();
+});
+
 test('Chart emits ui.v1.event chart.setSelection with baseRevision', async () => {
   const actions: any[] = [];
   const kernel = createKernel({

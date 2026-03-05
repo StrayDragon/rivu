@@ -831,6 +831,216 @@ export const chartPropsV1JsonSchema = {
   "additionalProperties": false
 } as const;
 
+export const pivotTablePropsV1JsonSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "dataRef": {
+      "type": "object",
+      "properties": {
+        "datasetId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "datasetId"
+      ],
+      "additionalProperties": false
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "required": [
+        "columns",
+        "rows"
+      ],
+      "additionalProperties": {}
+    },
+    "rows": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "columns": {
+      "type": "string",
+      "minLength": 1
+    },
+    "value": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agg": {
+      "type": "string",
+      "enum": [
+        "sum",
+        "count",
+        "avg",
+        "min",
+        "max"
+      ]
+    },
+    "options": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "showTotals": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "rows",
+    "columns",
+    "value",
+    "agg"
+  ],
+  "additionalProperties": false
+} as const;
+
+export const heatmapPropsV1JsonSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "dataRef": {
+      "type": "object",
+      "properties": {
+        "datasetId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "datasetId"
+      ],
+      "additionalProperties": false
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "required": [
+        "columns",
+        "rows"
+      ],
+      "additionalProperties": {}
+    },
+    "encoding": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "string",
+          "minLength": 1
+        },
+        "y": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "options": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "encoding"
+  ],
+  "additionalProperties": false
+} as const;
+
 export const uiInputLimitsV1JsonSchema = {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",

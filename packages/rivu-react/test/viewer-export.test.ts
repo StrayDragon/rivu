@@ -98,3 +98,92 @@ test('exportChartSvgsV1 exports <svg> assets for Chart components', () => {
   expect(svgs.cmp_chart?.startsWith('<svg')).toBe(true);
   expect(svgs.cmp_chart).toContain('</svg>');
 });
+
+test('exportHtmlV1 renders PivotTable deterministically', () => {
+  const snapshot = {
+    schema: 'rivu.export.v1',
+    sharedState: {
+      ui: {
+        v: 1,
+        datasets: {
+          ds_sales: {
+            columns: ['region', 'quarter', 'revenue'],
+            rows: [
+              ['APAC', 'Q1', 10],
+              ['APAC', 'Q2', 20],
+              ['EU', 'Q1', 7],
+            ],
+          },
+        },
+        components: {
+          cmp_pivot: {
+            type: 'PivotTable',
+            schemaVersion: 1,
+            props: {
+              dataRef: { datasetId: 'ds_sales' },
+              rows: ['region'],
+              columns: 'quarter',
+              value: 'revenue',
+              agg: 'sum',
+              options: { title: 'Revenue Pivot', unit: 'USD', showTotals: true },
+            },
+            revision: 0,
+            mounts: [{ messageId: 'msg_1', slot: 'inline', order: 0 }],
+          },
+        },
+      },
+    },
+    messages: [{ id: 'msg_1', role: 'assistant', content: 'Hello export' }],
+    toolCalls: [],
+  };
+
+  const html1 = exportHtmlV1(snapshot as any);
+  const html2 = exportHtmlV1(snapshot as any);
+  expect(html1).toBe(html2);
+  expect(html1).toContain('Revenue Pivot');
+  expect(html1).toContain('APAC');
+  expect(html1).toContain('Q1');
+});
+
+test('exportHtmlV1 renders Heatmap deterministically', () => {
+  const snapshot = {
+    schema: 'rivu.export.v1',
+    sharedState: {
+      ui: {
+        v: 1,
+        datasets: {
+          ds_latency: {
+            columns: ['bucket', 'endpoint', 'p95_ms'],
+            rows: [
+              ['0-50', '/api/a', 12],
+              ['50-100', '/api/a', 62],
+              ['0-50', '/api/b', 18],
+            ],
+          },
+        },
+        components: {
+          cmp_heatmap: {
+            type: 'Heatmap',
+            schemaVersion: 1,
+            props: {
+              dataRef: { datasetId: 'ds_latency' },
+              encoding: { x: 'bucket', y: 'endpoint', value: 'p95_ms' },
+              options: { title: 'Latency heatmap', unit: 'ms', height: 240 },
+            },
+            revision: 0,
+            mounts: [{ messageId: 'msg_1', slot: 'inline', order: 0 }],
+          },
+        },
+      },
+    },
+    messages: [{ id: 'msg_1', role: 'assistant', content: 'Hello export' }],
+    toolCalls: [],
+  };
+
+  const html1 = exportHtmlV1(snapshot as any);
+  const html2 = exportHtmlV1(snapshot as any);
+  expect(html1).toBe(html2);
+  expect(html1).toContain('Latency heatmap');
+  expect(html1).toContain('/api/a');
+  expect(html1).toContain('0-50');
+});

@@ -44,6 +44,7 @@ from .ui_v1_event_processor import (
     UiV1EventProcessorError,
     UnknownComponentError,
 )
+from .viewer_pivot_heatmap import HeatmapPropsV1, PivotTablePropsV1
 
 __all__ = [
     "__version__",
@@ -99,6 +100,8 @@ __all__ = [
     "RevisionConflictError",
     "InvalidPayloadError",
     "ProcessedResult",
+    "PivotTablePropsV1",
+    "HeatmapPropsV1",
 ]
 
 __version__ = "0.1.0"

@@ -527,6 +527,232 @@ pub fn parse_ui_data_ref_v1(bytes: &[u8], limits: DecodeLimits) -> Result<UiData
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PivotTableAggV1 {
+    Sum,
+    Count,
+    Avg,
+    Min,
+    Max,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PivotTableOptionsV1 {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub unit: Option<String>,
+    #[serde(default)]
+    pub show_totals: Option<bool>,
+}
+
+impl PivotTableOptionsV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if let Some(title) = &self.title {
+            if title.trim().is_empty() {
+                return Err(UiSpecError::ValidationError("options.title must be non-empty".into()));
+            }
+        }
+        if let Some(unit) = &self.unit {
+            if unit.trim().is_empty() {
+                return Err(UiSpecError::ValidationError("options.unit must be non-empty".into()));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PivotTablePropsV1 {
+    #[serde(default)]
+    pub data_ref: Option<UiDataRefV1>,
+    #[serde(default)]
+    pub data: Option<UiDatasetV1>,
+    pub rows: Vec<String>,
+    pub columns: String,
+    pub value: String,
+    pub agg: PivotTableAggV1,
+    #[serde(default)]
+    pub options: Option<PivotTableOptionsV1>,
+}
+
+impl PivotTablePropsV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if self.data_ref.is_none() && self.data.is_none() {
+            return Err(UiSpecError::ValidationError("either dataRef or data must be set".into()));
+        }
+
+        if self.rows.is_empty() {
+            return Err(UiSpecError::ValidationError("rows must be non-empty".into()));
+        }
+        for name in &self.rows {
+            if name.trim().is_empty() {
+                return Err(UiSpecError::ValidationError("rows[*] must be non-empty".into()));
+            }
+        }
+        if self.columns.trim().is_empty() {
+            return Err(UiSpecError::ValidationError("columns must be non-empty".into()));
+        }
+        if self.value.trim().is_empty() {
+            return Err(UiSpecError::ValidationError("value must be non-empty".into()));
+        }
+
+        if let Some(data_ref) = &self.data_ref {
+            data_ref.validate()?;
+        }
+
+        if let Some(data) = &self.data {
+            data.validate()?;
+            let columns: std::collections::BTreeSet<_> = data.columns.iter().collect();
+            for name in self
+                .rows
+                .iter()
+                .chain(std::iter::once(&self.columns))
+                .chain(std::iter::once(&self.value))
+            {
+                if !columns.contains(name) {
+                    return Err(UiSpecError::ValidationError("referenced column must exist in data.columns".into()));
+                }
+            }
+        }
+
+        if let Some(options) = &self.options {
+            options.validate()?;
+        }
+
+        Ok(())
+    }
+}
+
+pub fn parse_pivot_table_props_v1(bytes: &[u8], limits: DecodeLimits) -> Result<PivotTablePropsV1, UiSpecError> {
+    let value: Value = serde_json::from_slice(bytes)?;
+    check_limits(bytes, &value, limits)?;
+    let props: PivotTablePropsV1 = serde_json::from_value(value)?;
+    props.validate()?;
+    Ok(props)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HeatmapEncodingV1 {
+    pub x: String,
+    pub y: String,
+    pub value: String,
+}
+
+impl HeatmapEncodingV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if self.x.trim().is_empty() {
+            return Err(UiSpecError::ValidationError("encoding.x must be non-empty".into()));
+        }
+        if self.y.trim().is_empty() {
+            return Err(UiSpecError::ValidationError("encoding.y must be non-empty".into()));
+        }
+        if self.value.trim().is_empty() {
+            return Err(UiSpecError::ValidationError("encoding.value must be non-empty".into()));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HeatmapOptionsV1 {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub unit: Option<String>,
+    #[serde(default)]
+    pub height: Option<i64>,
+}
+
+impl HeatmapOptionsV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if let Some(title) = &self.title {
+            if title.trim().is_empty() {
+                return Err(UiSpecError::ValidationError("options.title must be non-empty".into()));
+            }
+        }
+        if let Some(unit) = &self.unit {
+            if unit.trim().is_empty() {
+                return Err(UiSpecError::ValidationError("options.unit must be non-empty".into()));
+            }
+        }
+        if let Some(height) = self.height {
+            if height < 1 || height > 2000 {
+                return Err(UiSpecError::ValidationError("options.height must be in [1, 2000]".into()));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HeatmapPropsV1 {
+    #[serde(default)]
+    pub data_ref: Option<UiDataRefV1>,
+    #[serde(default)]
+    pub data: Option<UiDatasetV1>,
+    pub encoding: HeatmapEncodingV1,
+    #[serde(default)]
+    pub options: Option<HeatmapOptionsV1>,
+}
+
+impl HeatmapPropsV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if self.data_ref.is_none() && self.data.is_none() {
+            return Err(UiSpecError::ValidationError("either dataRef or data must be set".into()));
+        }
+
+        if let Some(data_ref) = &self.data_ref {
+            data_ref.validate()?;
+        }
+
+        self.encoding.validate()?;
+
+        if let Some(data) = &self.data {
+            data.validate()?;
+
+            let x_index = data.columns.iter().position(|c| c == &self.encoding.x);
+            let y_index = data.columns.iter().position(|c| c == &self.encoding.y);
+            let value_index = data.columns.iter().position(|c| c == &self.encoding.value);
+            if x_index.is_none() || y_index.is_none() || value_index.is_none() {
+                return Err(UiSpecError::ValidationError("encoding columns must exist in data.columns".into()));
+            }
+            let value_index = value_index.unwrap();
+
+            for row in &data.rows {
+                match row.get(value_index) {
+                    Some(Value::Null) | Some(Value::Number(_)) | None => {}
+                    Some(_) => {
+                        return Err(UiSpecError::ValidationError(
+                            "encoding.value column must be number|null when using inline data".into(),
+                        ));
+                    }
+                }
+            }
+        }
+
+        if let Some(options) = &self.options {
+            options.validate()?;
+        }
+
+        Ok(())
+    }
+}
+
+pub fn parse_heatmap_props_v1(bytes: &[u8], limits: DecodeLimits) -> Result<HeatmapPropsV1, UiSpecError> {
+    let value: Value = serde_json::from_slice(bytes)?;
+    check_limits(bytes, &value, limits)?;
+    let props: HeatmapPropsV1 = serde_json::from_value(value)?;
+    props.validate()?;
+    Ok(props)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct A2uiMountV1 {
     pub message_id: String,

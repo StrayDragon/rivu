@@ -18,6 +18,24 @@ export type RivuSlotProps = {
     td?: RivuSlotPropOverrides;
     emptyState?: RivuSlotPropOverrides;
   };
+  PivotTable?: {
+    root?: RivuSlotPropOverrides;
+    title?: RivuSlotPropOverrides;
+    table?: RivuSlotPropOverrides;
+    thead?: RivuSlotPropOverrides;
+    th?: RivuSlotPropOverrides;
+    tbody?: RivuSlotPropOverrides;
+    tr?: RivuSlotPropOverrides;
+    td?: RivuSlotPropOverrides;
+  };
+  Heatmap?: {
+    root?: RivuSlotPropOverrides;
+    title?: RivuSlotPropOverrides;
+    grid?: RivuSlotPropOverrides;
+    th?: RivuSlotPropOverrides;
+    td?: RivuSlotPropOverrides;
+    cell?: RivuSlotPropOverrides;
+  };
   ApprovalCard?: {
     root?: RivuSlotPropOverrides;
     status?: RivuSlotPropOverrides;

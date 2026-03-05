@@ -17,6 +17,8 @@ pub use ui_spec::{
     UiComponentV1, UiDataRefV1, UiDatasetV1, UiMountV1, UiSpecError, UiStateV1, UiV1CapabilitiesChartFeaturesV1,
     UiV1CapabilitiesComponentRangeV1, UiV1CapabilitiesCustomEvent, UiV1CapabilitiesExportFeaturesV1, UiV1CapabilitiesFeaturesV1,
     UiV1CapabilitiesValueV1, UiV1CustomEvent, UiV1EventValue, UI_V1_CAPABILITIES_NAME, UI_V1_EVENT_NAME,
+    parse_heatmap_props_v1, parse_pivot_table_props_v1, HeatmapEncodingV1, HeatmapOptionsV1, HeatmapPropsV1, PivotTableAggV1,
+    PivotTableOptionsV1, PivotTablePropsV1,
 };
 
 pub use seq::{SeqAllocator, SeqError};

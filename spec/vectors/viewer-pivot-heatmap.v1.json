@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "pivotTablePropsV1": {
+    "valid": [
+      {
+        "id": "dataRef_basic_sum",
+        "props": {
+          "dataRef": { "datasetId": "ds_sales_by_region" },
+          "rows": ["region"],
+          "columns": "quarter",
+          "value": "revenue",
+          "agg": "sum",
+          "options": { "title": "Revenue Pivot", "unit": "USD", "showTotals": true }
+        }
+      },
+      {
+        "id": "inline_data_multi_rows_avg",
+        "props": {
+          "data": {
+            "columns": ["region", "product", "quarter", "revenue"],
+            "rows": [
+              ["APAC", "A", "Q1", 10],
+              ["APAC", "A", "Q2", 20],
+              ["APAC", "B", "Q1", 5],
+              ["EU", "A", "Q1", 7]
+            ]
+          },
+          "rows": ["region", "product"],
+          "columns": "quarter",
+          "value": "revenue",
+          "agg": "avg"
+        }
+      },
+      {
+        "id": "dataRef_and_inline_allowed",
+        "props": {
+          "dataRef": { "datasetId": "ds_sales_by_region" },
+          "data": {
+            "columns": ["region", "quarter", "revenue"],
+            "rows": [["APAC", "Q1", 1]]
+          },
+          "rows": ["region"],
+          "columns": "quarter",
+          "value": "revenue",
+          "agg": "count"
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "id": "missing_data_source",
+        "props": { "rows": ["region"], "columns": "quarter", "value": "revenue", "agg": "sum" }
+      },
+      {
+        "id": "rows_empty",
+        "props": {
+          "dataRef": { "datasetId": "ds_sales_by_region" },
+          "rows": [],
+          "columns": "quarter",
+          "value": "revenue",
+          "agg": "sum"
+        }
+      },
+      {
+        "id": "agg_invalid",
+        "props": {
+          "dataRef": { "datasetId": "ds_sales_by_region" },
+          "rows": ["region"],
+          "columns": "quarter",
+          "value": "revenue",
+          "agg": "median"
+        }
+      },
+      {
+        "id": "inline_data_missing_referenced_column",
+        "props": {
+          "data": {
+            "columns": ["region", "quarter", "revenue"],
+            "rows": [["APAC", "Q1", 1]]
+          },
+          "rows": ["region"],
+          "columns": "missing",
+          "value": "revenue",
+          "agg": "sum"
+        }
+      },
+      {
+        "id": "options_title_empty",
+        "props": {
+          "dataRef": { "datasetId": "ds_sales_by_region" },
+          "rows": ["region"],
+          "columns": "quarter",
+          "value": "revenue",
+          "agg": "sum",
+          "options": { "title": "" }
+        }
+      }
+    ]
+  },
+  "heatmapPropsV1": {
+    "valid": [
+      {
+        "id": "dataRef_basic",
+        "props": {
+          "dataRef": { "datasetId": "ds_latency_heatmap" },
+          "encoding": { "x": "bucket", "y": "endpoint", "value": "p95_ms" },
+          "options": { "title": "Latency heatmap", "unit": "ms", "height": 240 }
+        }
+      },
+      {
+        "id": "inline_data_numeric",
+        "props": {
+          "data": {
+            "columns": ["bucket", "endpoint", "p95_ms"],
+            "rows": [
+              ["0-50", "/api/a", 12],
+              ["50-100", "/api/a", 62],
+              ["0-50", "/api/b", 18],
+              ["50-100", "/api/b", null]
+            ]
+          },
+          "encoding": { "x": "bucket", "y": "endpoint", "value": "p95_ms" }
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "id": "missing_data_source",
+        "props": { "encoding": { "x": "x", "y": "y", "value": "v" } }
+      },
+      {
+        "id": "inline_data_missing_encoding_column",
+        "props": {
+          "data": { "columns": ["x", "y", "v"], "rows": [["A", "B", 1]] },
+          "encoding": { "x": "x", "y": "missing", "value": "v" }
+        }
+      },
+      {
+        "id": "inline_data_value_non_numeric",
+        "props": {
+          "data": {
+            "columns": ["bucket", "endpoint", "p95_ms"],
+            "rows": [["0-50", "/api/a", "bad"]]
+          },
+          "encoding": { "x": "bucket", "y": "endpoint", "value": "p95_ms" }
+        }
+      },
+      {
+        "id": "options_height_zero",
+        "props": {
+          "dataRef": { "datasetId": "ds_latency_heatmap" },
+          "encoding": { "x": "bucket", "y": "endpoint", "value": "p95_ms" },
+          "options": { "height": 0 }
+        }
+      }
+    ]
+  }
+}
+

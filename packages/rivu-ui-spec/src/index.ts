@@ -12,6 +12,12 @@ export { a2uiOpV1Schema, a2uiV1Schema } from './a2ui-v1.js';
 export type { ChartEncodingV1, ChartMarkV1, ChartOptionsV1, ChartPropsV1 } from './ui-chart.js';
 export { chartEncodingV1Schema, chartMarkV1Schema, chartOptionsV1Schema, chartPropsV1Schema } from './ui-chart.js';
 
+export type { PivotTableAggV1, PivotTableOptionsV1, PivotTablePropsV1 } from './ui-pivot-table.js';
+export { pivotTableAggV1Schema, pivotTableOptionsV1Schema, pivotTablePropsV1Schema } from './ui-pivot-table.js';
+
+export type { HeatmapEncodingV1, HeatmapOptionsV1, HeatmapPropsV1 } from './ui-heatmap.js';
+export { heatmapEncodingV1Schema, heatmapOptionsV1Schema, heatmapPropsV1Schema } from './ui-heatmap.js';
+
 export type {
   ChartInteractionEventNameV1,
   ChartSelectionKindV1,
@@ -81,6 +87,8 @@ export {
   uiDataRefV1JsonSchema,
   a2uiV1JsonSchema,
   chartPropsV1JsonSchema,
+  pivotTablePropsV1JsonSchema,
+  heatmapPropsV1JsonSchema,
   uiInputLimitsV1JsonSchema,
   uiV1CustomEventJsonSchema,
   uiV1EventValueJsonSchema,

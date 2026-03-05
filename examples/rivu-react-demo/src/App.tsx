@@ -94,6 +94,16 @@ const EXAMPLES = {
       description: 'Inline data (columns+rows) for token efficiency.',
     },
     {
+      componentId: 'cmp_pivot_table',
+      title: 'PivotTable + dataset',
+      description: 'Pure aggregation from sharedState.ui.datasets (export-friendly).',
+    },
+    {
+      componentId: 'cmp_heatmap',
+      title: 'Heatmap + dataset',
+      description: 'Explicit encoding (x/y/value) with token-based palette.',
+    },
+    {
       componentId: 'cmp_line_chart',
       title: 'LineChart',
       description: 'Simple inline points example.',
@@ -968,6 +978,7 @@ function DocsSection() {
     { title: 'Integration quickstart', path: 'docs/integration-quickstart.md', note: 'Canonical SSE/WS + resumeFrom baseline.' },
     { title: 'Integration guide', path: 'docs/integration.md', note: 'Kernel + registry + lifecycle + component catalog.' },
     { title: 'Viewer export', path: 'docs/viewer-export.md', note: 'Snapshot → HTML/SVG/PDF export pipeline.' },
+    { title: 'PivotTable & Heatmap', path: 'docs/viewer-pivot-heatmap.md', note: 'Props schema + datasets guidance + export notes.' },
     { title: 'Export & review', path: 'docs/export-review.md', note: 'Snapshot/export baseline and restoration.' },
     { title: 'Event compaction', path: 'docs/event-compaction.md', note: 'Server-side flush/merge + snapshot tuning.' },
     { title: 'Design system', path: 'docs/design-system.md', note: 'Theme tokens + slots conventions.' },

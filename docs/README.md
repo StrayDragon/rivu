@@ -28,6 +28,7 @@ Export pipeline:
 
 - `docs/viewer-export.md` — HTML/SVG/PDF export guidance (deterministic + offline)
 - `docs/viewer-export.md` pairs with `packages/rivu-react/src/viewer-export.tsx`
+- `docs/viewer-pivot-heatmap.md` — PivotTable/Heatmap props + datasets guidance
 
 Integrations (adapters):
 

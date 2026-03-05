@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { z } from 'zod';
 
 import { selectUiDatasetV1 } from 'rivu-kernel';
-import { uiDataRefV1Schema } from 'rivu-ui-spec';
+import { heatmapPropsV1Schema, pivotTablePropsV1Schema, uiDataRefV1Schema, type HeatmapPropsV1, type PivotTablePropsV1 } from 'rivu-ui-spec';
 
 import type { RivuComponentRegistration, RivuComponentRegistry, RivuHost } from '../registry.js';
 import { defaultRenderHooks } from '../render-hooks.js';
@@ -432,6 +432,1012 @@ export const dataTableRegistrationV1: RivuComponentRegistration<DataTablePropsV1
   },
 };
 
+export const PIVOT_TABLE_COMPONENT_TYPE = 'PivotTable' as const;
+export const PIVOT_TABLE_SCHEMA_VERSION = 1 as const;
+
+export type PivotTableSlots = {
+  Title?: (args: { title?: string; unit?: string }) => ReactNode;
+  HeaderCell?: (args: { kind: 'corner' | 'row' | 'column' | 'total'; label: string }) => ReactNode;
+  Cell?: (args: { value: number | null; formatted: string; rowIndex: number; columnIndex: number; isTotal: boolean }) => ReactNode;
+};
+
+type PivotAccumulator = { kind: 'count'; count: number } | { kind: 'sum'; sum: number } | { kind: 'avg'; sum: number; count: number } | { kind: 'min'; value: number } | { kind: 'max'; value: number };
+
+function pivotAdd(acc: PivotAccumulator | null, agg: PivotTablePropsV1['agg'], cell: unknown): PivotAccumulator | { error: string } {
+  if (cell === null || cell === undefined) {
+    if (!acc) {
+      if (agg === 'count') return { kind: 'count', count: 0 };
+      if (agg === 'sum') return { kind: 'sum', sum: 0 };
+      if (agg === 'avg') return { kind: 'avg', sum: 0, count: 0 };
+      if (agg === 'min') return { kind: 'min', value: Number.POSITIVE_INFINITY };
+      return { kind: 'max', value: Number.NEGATIVE_INFINITY };
+    }
+    return acc;
+  }
+
+  if (agg === 'count') {
+    const next = acc && acc.kind === 'count' ? acc : { kind: 'count' as const, count: 0 };
+    return { kind: 'count', count: next.count + 1 };
+  }
+
+  if (typeof cell !== 'number' || !Number.isFinite(cell)) {
+    return { error: 'value column must be number|null for agg!=count' };
+  }
+
+  if (agg === 'sum') {
+    const next = acc && acc.kind === 'sum' ? acc : { kind: 'sum' as const, sum: 0 };
+    return { kind: 'sum', sum: next.sum + cell };
+  }
+  if (agg === 'avg') {
+    const next = acc && acc.kind === 'avg' ? acc : { kind: 'avg' as const, sum: 0, count: 0 };
+    return { kind: 'avg', sum: next.sum + cell, count: next.count + 1 };
+  }
+  if (agg === 'min') {
+    const next = acc && acc.kind === 'min' ? acc : { kind: 'min' as const, value: Number.POSITIVE_INFINITY };
+    return { kind: 'min', value: Math.min(next.value, cell) };
+  }
+  const next = acc && acc.kind === 'max' ? acc : { kind: 'max' as const, value: Number.NEGATIVE_INFINITY };
+  return { kind: 'max', value: Math.max(next.value, cell) };
+}
+
+function pivotMerge(acc: PivotAccumulator | null, next: PivotAccumulator | null): PivotAccumulator | null {
+  if (!next) return acc;
+  if (!acc) return next;
+  if (acc.kind === 'count' && next.kind === 'count') return { kind: 'count', count: acc.count + next.count };
+  if (acc.kind === 'sum' && next.kind === 'sum') return { kind: 'sum', sum: acc.sum + next.sum };
+  if (acc.kind === 'avg' && next.kind === 'avg') return { kind: 'avg', sum: acc.sum + next.sum, count: acc.count + next.count };
+  if (acc.kind === 'min' && next.kind === 'min') return { kind: 'min', value: Math.min(acc.value, next.value) };
+  if (acc.kind === 'max' && next.kind === 'max') return { kind: 'max', value: Math.max(acc.value, next.value) };
+  return acc;
+}
+
+function pivotFinalize(acc: PivotAccumulator | null, agg: PivotTablePropsV1['agg']): number | null {
+  if (!acc) return null;
+  if (acc.kind === 'count') return acc.count;
+  if (acc.kind === 'sum') return acc.sum;
+  if (acc.kind === 'avg') return acc.count > 0 ? acc.sum / acc.count : null;
+  if (acc.kind === 'min') return Number.isFinite(acc.value) ? acc.value : null;
+  if (acc.kind === 'max') return Number.isFinite(acc.value) ? acc.value : null;
+  return null;
+}
+
+export function PivotTable(
+  props: PivotTablePropsV1 & { host?: RivuHost; componentId?: string; className?: string; style?: CSSProperties; slots?: PivotTableSlots },
+) {
+  const hooks = props.host?.renderHooks ?? defaultRenderHooks;
+  const slotProps = props.host?.slotProps?.PivotTable;
+  const componentId = props.componentId ?? 'unknown';
+  const meta = { componentId, componentType: PIVOT_TABLE_COMPONENT_TYPE };
+
+  const dataset = props.data;
+  if (!dataset) {
+    return (
+      <UnknownComponentCard
+        title="Missing data"
+        componentId={componentId}
+        componentType={PIVOT_TABLE_COMPONENT_TYPE}
+        schemaVersion={PIVOT_TABLE_SCHEMA_VERSION}
+        details={{ hint: 'Provide props.dataRef.datasetId or props.data.' }}
+      />
+    );
+  }
+
+  const indexByName = new Map(dataset.columns.map((name, i) => [name, i] as const));
+  const rowDimIndexes = props.rows.map((name) => indexByName.get(name)).filter((x) => typeof x === 'number') as number[];
+  const colDimIndex = indexByName.get(props.columns);
+  const valueIndex = indexByName.get(props.value);
+
+  if (rowDimIndexes.length !== props.rows.length || typeof colDimIndex !== 'number' || typeof valueIndex !== 'number') {
+    return (
+      <UnknownComponentCard
+        title="Dataset column mismatch"
+        componentId={componentId}
+        componentType={PIVOT_TABLE_COMPONENT_TYPE}
+        schemaVersion={PIVOT_TABLE_SCHEMA_VERSION}
+        details={{ requiredColumns: { rows: props.rows, columns: props.columns, value: props.value }, datasetColumns: dataset.columns }}
+      />
+    );
+  }
+
+  const rowOrder: string[] = [];
+  const colOrder: string[] = [];
+  const rowValuesByKey = new Map<string, Array<string | number | null>>();
+  const colValuesByKey = new Map<string, string | number | null>();
+  const matrix = new Map<string, Map<string, PivotAccumulator>>();
+
+  for (const [rowIndex, row] of dataset.rows.entries()) {
+    const rowDims = rowDimIndexes.map((i) => (row[i] as any) ?? null) as Array<string | number | null>;
+    const colDim = ((row[colDimIndex] as any) ?? null) as string | number | null;
+    const valueCell = (row[valueIndex] as any) ?? null;
+
+    const rowKey = JSON.stringify(rowDims);
+    const colKey = JSON.stringify(colDim);
+
+    if (!rowValuesByKey.has(rowKey)) {
+      rowValuesByKey.set(rowKey, rowDims);
+      rowOrder.push(rowKey);
+    }
+    if (!colValuesByKey.has(colKey)) {
+      colValuesByKey.set(colKey, colDim);
+      colOrder.push(colKey);
+    }
+
+    const rowMap = matrix.get(rowKey) ?? new Map<string, PivotAccumulator>();
+    const prev = rowMap.get(colKey) ?? null;
+    const next = pivotAdd(prev, props.agg, valueCell);
+    if ('error' in next) {
+      return (
+        <UnknownComponentCard
+          title="PivotTable aggregation failed"
+          componentId={componentId}
+          componentType={PIVOT_TABLE_COMPONENT_TYPE}
+          schemaVersion={PIVOT_TABLE_SCHEMA_VERSION}
+          details={{ agg: props.agg, value: props.value, rowIndex, error: next.error }}
+        />
+      );
+    }
+    rowMap.set(colKey, next);
+    matrix.set(rowKey, rowMap);
+  }
+
+  const showTotals = props.options?.showTotals ?? false;
+  const unit = props.options?.unit;
+
+  const rootSlot = applySlotProps(
+    {
+      className: props.className,
+      style: {
+        border: `1px solid ${theme.border}`,
+        borderRadius: theme.radius,
+        overflow: 'hidden',
+        background: theme.bg,
+        boxShadow: theme.shadow,
+        ...props.style,
+      },
+    },
+    slotProps?.root,
+  );
+  const { className: rootClassName, style: rootStyle, ...rootAttrs } = rootSlot;
+
+  return (
+    <div
+      className={rootClassName}
+      style={rootStyle}
+      {...(rootAttrs as any)}
+    >
+      {props.options?.title ? (
+        <div
+          {...(() => {
+            const titleSlot = applySlotProps(
+              {
+                style: {
+                  padding: `10px var(--rivu-space-3, 12px)`,
+                  fontSize: 'var(--rivu-font-size-base, 14px)',
+                  fontWeight: 750,
+                  color: theme.fg,
+                  borderBottom: `1px solid ${theme.borderMuted}`,
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: 8,
+                },
+              },
+              slotProps?.title,
+            );
+            const { className, style, ...attrs } = titleSlot;
+            return { className, style, ...attrs };
+          })()}
+        >
+          {props.slots?.Title ? (
+            props.slots.Title(unit ? { title: props.options.title, unit } : { title: props.options.title })
+          ) : (
+            <>
+              <span>{hooks.renderMarkdown(props.options.title, { ...meta, path: 'options.title' })}</span>
+              {unit ? <span style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.muted }}>{unit}</span> : null}
+            </>
+          )}
+        </div>
+      ) : null}
+
+      <div style={{ overflowX: 'auto' }}>
+        <table
+          {...(() => {
+            const tableSlot = applySlotProps(
+              { style: { width: '100%', borderCollapse: 'collapse', fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fg } },
+              slotProps?.table,
+            );
+            const { className, style, ...attrs } = tableSlot;
+            return { className, style, ...attrs };
+          })()}
+        >
+          <thead
+            {...(() => {
+              const theadSlot = applySlotProps({}, slotProps?.thead);
+              const { className, style, ...attrs } = theadSlot;
+              return { className, style, ...attrs };
+            })()}
+          >
+            <tr
+              {...(() => {
+                const trSlot = applySlotProps({}, slotProps?.tr);
+                const { className, style, ...attrs } = trSlot;
+                return { className, style, ...attrs };
+              })()}
+            >
+              {props.rows.map((dim) => (
+                <th
+                  key={dim}
+                  {...(() => {
+                    const thSlot = applySlotProps(
+                      {
+                        scope: 'col',
+                        style: {
+                          textAlign: 'left',
+                          padding: `10px var(--rivu-space-3, 12px)`,
+                          background: theme.bgMuted,
+                          borderBottom: `1px solid ${theme.border}`,
+                          color: theme.fgMuted,
+                          fontWeight: 650,
+                          whiteSpace: 'nowrap',
+                        },
+                      },
+                      slotProps?.th,
+                    );
+                    const { className, style, ...attrs } = thSlot;
+                    return { className, style, ...attrs };
+                  })()}
+                >
+                  {props.slots?.HeaderCell ? props.slots.HeaderCell({ kind: 'row', label: dim }) : dim}
+                </th>
+              ))}
+
+              {colOrder.map((colKey) => {
+                const value = colValuesByKey.get(colKey) ?? null;
+                const label =
+                  value === null
+                    ? ''
+                    : typeof value === 'number'
+                      ? hooks.formatNumber(value, { ...meta, path: `columns[${colKey}]` })
+                      : hooks.formatValue(value, { ...meta, path: `columns[${colKey}]` });
+                return (
+                  <th
+                    key={colKey}
+                    {...(() => {
+                      const thSlot = applySlotProps(
+                        {
+                          scope: 'col',
+                          style: {
+                            textAlign: 'right',
+                            padding: `10px var(--rivu-space-3, 12px)`,
+                            background: theme.bgMuted,
+                            borderBottom: `1px solid ${theme.border}`,
+                            color: theme.fgMuted,
+                            fontWeight: 650,
+                            whiteSpace: 'nowrap',
+                          },
+                        },
+                        slotProps?.th,
+                      );
+                      const { className, style, ...attrs } = thSlot;
+                      return { className, style, ...attrs };
+                    })()}
+                  >
+                    {props.slots?.HeaderCell ? props.slots.HeaderCell({ kind: 'column', label }) : label}
+                  </th>
+                );
+              })}
+
+              {showTotals ? (
+                <th
+                  {...(() => {
+                    const thSlot = applySlotProps(
+                      {
+                        scope: 'col',
+                        style: {
+                          textAlign: 'right',
+                          padding: `10px var(--rivu-space-3, 12px)`,
+                          background: theme.bgMuted,
+                          borderBottom: `1px solid ${theme.border}`,
+                          color: theme.fgMuted,
+                          fontWeight: 650,
+                          whiteSpace: 'nowrap',
+                        },
+                      },
+                      slotProps?.th,
+                    );
+                    const { className, style, ...attrs } = thSlot;
+                    return { className, style, ...attrs };
+                  })()}
+                >
+                  {props.slots?.HeaderCell ? props.slots.HeaderCell({ kind: 'total', label: 'Total' }) : 'Total'}
+                </th>
+              ) : null}
+            </tr>
+          </thead>
+
+          <tbody
+            {...(() => {
+              const tbodySlot = applySlotProps({}, slotProps?.tbody);
+              const { className, style, ...attrs } = tbodySlot;
+              return { className, style, ...attrs };
+            })()}
+          >
+            {rowOrder.map((rowKey, rowIndex) => {
+              const rowDims = rowValuesByKey.get(rowKey)!;
+              const rowMap = matrix.get(rowKey) ?? new Map<string, PivotAccumulator>();
+
+              const rowCellsAcc = colOrder.map((colKey) => rowMap.get(colKey) ?? null);
+              const rowCells = rowCellsAcc.map((acc) => pivotFinalize(acc, props.agg));
+              const rowTotalAcc = showTotals ? Array.from(rowMap.values()).reduce((acc, next) => pivotMerge(acc, next), null as PivotAccumulator | null) : null;
+              const rowTotal = showTotals ? pivotFinalize(rowTotalAcc, props.agg) : null;
+
+              return (
+                <tr
+                  key={rowKey}
+                  {...(() => {
+                    const trSlot = applySlotProps({}, slotProps?.tr);
+                    const { className, style, ...attrs } = trSlot;
+                    return { className, style, ...attrs };
+                  })()}
+                >
+                  {rowDims.map((dimValue, dimIndex) => {
+                    const label =
+                      dimValue === null
+                        ? ''
+                        : typeof dimValue === 'number'
+                          ? hooks.formatNumber(dimValue, { ...meta, path: `rows[${rowIndex}].dims[${dimIndex}]` })
+                          : hooks.formatValue(dimValue, { ...meta, path: `rows[${rowIndex}].dims[${dimIndex}]` });
+                    return (
+                      <th
+                        key={`${rowKey}:${dimIndex}`}
+                        {...(() => {
+                          const thSlot = applySlotProps(
+                            {
+                              scope: 'row',
+                              style: {
+                                textAlign: 'left',
+                                padding: `10px var(--rivu-space-3, 12px)`,
+                                borderBottom: `1px solid ${theme.borderMuted}`,
+                                background: dimIndex === props.rows.length - 1 ? theme.bg : theme.bgSubtle,
+                                color: theme.fg,
+                                fontWeight: 650,
+                                whiteSpace: 'nowrap',
+                              },
+                            },
+                            slotProps?.th,
+                          );
+                          const { className, style, ...attrs } = thSlot;
+                          return { className, style, ...attrs };
+                        })()}
+                      >
+                        {props.slots?.HeaderCell ? props.slots.HeaderCell({ kind: 'row', label }) : label}
+                      </th>
+                    );
+                  })}
+
+                  {rowCells.map((value, columnIndex) => {
+                    const formatted =
+                      value === null
+                        ? ''
+                        : hooks.formatNumber(value, {
+                            ...meta,
+                            path: `pivot[${rowIndex}][${columnIndex}]`,
+                            ...(unit ? { unit } : {}),
+                          });
+                    const isTotal = false;
+                    return (
+                      <td
+                        key={`${rowKey}:${columnIndex}`}
+                        {...(() => {
+                          const tdSlot = applySlotProps(
+                            {
+                              style: {
+                                textAlign: 'right',
+                                padding: `10px var(--rivu-space-3, 12px)`,
+                                borderBottom: `1px solid ${theme.borderMuted}`,
+                                whiteSpace: 'nowrap',
+                                color: theme.fg,
+                                fontVariantNumeric: 'tabular-nums',
+                              },
+                            },
+                            slotProps?.td,
+                          );
+                          const { className, style, ...attrs } = tdSlot;
+                          return { className, style, ...attrs };
+                        })()}
+                      >
+                        {props.slots?.Cell ? props.slots.Cell({ value, formatted, rowIndex, columnIndex, isTotal }) : formatted}
+                      </td>
+                    );
+                  })}
+
+                  {showTotals ? (
+                    <td
+                      {...(() => {
+                        const tdSlot = applySlotProps(
+                          {
+                            style: {
+                              textAlign: 'right',
+                              padding: `10px var(--rivu-space-3, 12px)`,
+                              borderBottom: `1px solid ${theme.borderMuted}`,
+                              whiteSpace: 'nowrap',
+                              color: theme.fg,
+                              fontVariantNumeric: 'tabular-nums',
+                              fontWeight: 650,
+                            },
+                          },
+                          slotProps?.td,
+                        );
+                        const { className, style, ...attrs } = tdSlot;
+                        return { className, style, ...attrs };
+                      })()}
+                    >
+                      {(() => {
+                        const formatted =
+                          rowTotal === null
+                            ? ''
+                            : hooks.formatNumber(rowTotal, { ...meta, path: `totals.row[${rowIndex}]`, ...(unit ? { unit } : {}) });
+                        const isTotal = true;
+                        return props.slots?.Cell ? props.slots.Cell({ value: rowTotal, formatted, rowIndex, columnIndex: colOrder.length, isTotal }) : formatted;
+                      })()}
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
+
+            {showTotals ? (
+              <tr
+                {...(() => {
+                  const trSlot = applySlotProps({}, slotProps?.tr);
+                  const { className, style, ...attrs } = trSlot;
+                  return { className, style, ...attrs };
+                })()}
+              >
+                <th
+                  colSpan={props.rows.length}
+                  {...(() => {
+                    const thSlot = applySlotProps(
+                      {
+                        scope: 'row',
+                        style: {
+                          textAlign: 'left',
+                          padding: `10px var(--rivu-space-3, 12px)`,
+                          borderTop: `1px solid ${theme.border}`,
+                          background: theme.bgMuted,
+                          color: theme.fgMuted,
+                          fontWeight: 750,
+                          whiteSpace: 'nowrap',
+                        },
+                      },
+                      slotProps?.th,
+                    );
+                    const { className, style, ...attrs } = thSlot;
+                    return { className, style, ...attrs };
+                  })()}
+                >
+                  {props.slots?.HeaderCell ? props.slots.HeaderCell({ kind: 'total', label: 'Total' }) : 'Total'}
+                </th>
+
+                {colOrder.map((colKey, columnIndex) => {
+                  const totalAcc = rowOrder.reduce((acc, rowKey) => pivotMerge(acc, matrix.get(rowKey)?.get(colKey) ?? null), null as PivotAccumulator | null);
+                  const total = pivotFinalize(totalAcc, props.agg);
+                  const formatted =
+                    total === null ? '' : hooks.formatNumber(total, { ...meta, path: `totals.col[${columnIndex}]`, ...(unit ? { unit } : {}) });
+                  const isTotal = true;
+                  return (
+                    <td
+                      key={`total:${colKey}`}
+                      {...(() => {
+                        const tdSlot = applySlotProps(
+                          {
+                            style: {
+                              textAlign: 'right',
+                              padding: `10px var(--rivu-space-3, 12px)`,
+                              borderTop: `1px solid ${theme.border}`,
+                              background: theme.bgMuted,
+                              color: theme.fg,
+                              fontWeight: 750,
+                              whiteSpace: 'nowrap',
+                              fontVariantNumeric: 'tabular-nums',
+                            },
+                          },
+                          slotProps?.td,
+                        );
+                        const { className, style, ...attrs } = tdSlot;
+                        return { className, style, ...attrs };
+                      })()}
+                    >
+                      {props.slots?.Cell ? props.slots.Cell({ value: total, formatted, rowIndex: rowOrder.length, columnIndex, isTotal }) : formatted}
+                    </td>
+                  );
+                })}
+
+                <td
+                  {...(() => {
+                    const tdSlot = applySlotProps(
+                      {
+                        style: {
+                          textAlign: 'right',
+                          padding: `10px var(--rivu-space-3, 12px)`,
+                          borderTop: `1px solid ${theme.border}`,
+                          background: theme.bgMuted,
+                          color: theme.fg,
+                          fontWeight: 750,
+                          whiteSpace: 'nowrap',
+                          fontVariantNumeric: 'tabular-nums',
+                        },
+                      },
+                      slotProps?.td,
+                    );
+                    const { className, style, ...attrs } = tdSlot;
+                    return { className, style, ...attrs };
+                  })()}
+                >
+                  {(() => {
+                    const totalAcc = rowOrder.reduce((acc, rowKey) => {
+                      const rowMap = matrix.get(rowKey);
+                      if (!rowMap) return acc;
+                      for (const cellAcc of rowMap.values()) acc = pivotMerge(acc, cellAcc);
+                      return acc;
+                    }, null as PivotAccumulator | null);
+                    const total = pivotFinalize(totalAcc, props.agg);
+                    const formatted =
+                      total === null ? '' : hooks.formatNumber(total, { ...meta, path: `totals.grand`, ...(unit ? { unit } : {}) });
+                    const isTotal = true;
+                    return props.slots?.Cell
+                      ? props.slots.Cell({ value: total, formatted, rowIndex: rowOrder.length, columnIndex: colOrder.length, isTotal })
+                      : formatted;
+                  })()}
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export const pivotTableRegistrationV1: RivuComponentRegistration<PivotTablePropsV1> = {
+  schemaVersion: PIVOT_TABLE_SCHEMA_VERSION,
+  propsSchema: pivotTablePropsV1Schema,
+  render: ({ kernel, host, componentId, componentType, schemaVersion, props }) => {
+    if (props.dataRef) {
+      const datasetId = props.dataRef.datasetId;
+      const dataset = selectUiDatasetV1(kernel.getState(), datasetId);
+      if (!dataset) {
+        return (
+          <UnknownComponentCard
+            title="Dataset not found"
+            componentId={componentId}
+            componentType={componentType}
+            schemaVersion={schemaVersion}
+            details={{ datasetId }}
+          />
+        );
+      }
+
+      const columns = new Set(dataset.columns);
+      const required = [...props.rows, props.columns, props.value];
+      const missingColumns = required.filter((name) => !columns.has(name));
+      if (missingColumns.length > 0) {
+        return (
+          <UnknownComponentCard
+            title="Dataset column mismatch"
+            componentId={componentId}
+            componentType={componentType}
+            schemaVersion={schemaVersion}
+            details={{ datasetId, missingColumns, datasetColumns: dataset.columns }}
+          />
+        );
+      }
+
+      return <PivotTable host={host} componentId={componentId} {...props} data={dataset as any} />;
+    }
+
+    return <PivotTable host={host} componentId={componentId} {...props} />;
+  },
+};
+
+export const HEATMAP_COMPONENT_TYPE = 'Heatmap' as const;
+export const HEATMAP_SCHEMA_VERSION = 1 as const;
+
+export type HeatmapSlots = {
+  Title?: (args: { title?: string; unit?: string }) => ReactNode;
+  HeaderCell?: (args: { kind: 'x' | 'y' | 'corner'; label: string }) => ReactNode;
+  Cell?: (args: { value: number | null; formatted: string; xIndex: number; yIndex: number }) => ReactNode;
+};
+
+export function Heatmap(
+  props: HeatmapPropsV1 & { host?: RivuHost; componentId?: string; className?: string; style?: CSSProperties; slots?: HeatmapSlots },
+) {
+  const hooks = props.host?.renderHooks ?? defaultRenderHooks;
+  const slotProps = props.host?.slotProps?.Heatmap;
+  const componentId = props.componentId ?? 'unknown';
+  const meta = { componentId, componentType: HEATMAP_COMPONENT_TYPE };
+
+  const dataset = props.data;
+  if (!dataset) {
+    return (
+      <UnknownComponentCard
+        title="Missing data"
+        componentId={componentId}
+        componentType={HEATMAP_COMPONENT_TYPE}
+        schemaVersion={HEATMAP_SCHEMA_VERSION}
+        details={{ hint: 'Provide props.dataRef.datasetId or props.data.' }}
+      />
+    );
+  }
+
+  const xIndex = dataset.columns.indexOf(props.encoding.x);
+  const yIndex = dataset.columns.indexOf(props.encoding.y);
+  const valueIndex = dataset.columns.indexOf(props.encoding.value);
+  if (xIndex < 0 || yIndex < 0 || valueIndex < 0) {
+    return (
+      <UnknownComponentCard
+        title="Dataset column mismatch"
+        componentId={componentId}
+        componentType={HEATMAP_COMPONENT_TYPE}
+        schemaVersion={HEATMAP_SCHEMA_VERSION}
+        details={{ encoding: props.encoding, datasetColumns: dataset.columns }}
+      />
+    );
+  }
+
+  const xOrder: string[] = [];
+  const yOrder: string[] = [];
+  const xValueByKey = new Map<string, string | number | null>();
+  const yValueByKey = new Map<string, string | number | null>();
+  const cellByKey = new Map<string, number | null>();
+
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+
+  for (const [rowIndex, row] of dataset.rows.entries()) {
+    const x = ((row[xIndex] as any) ?? null) as string | number | null;
+    const y = ((row[yIndex] as any) ?? null) as string | number | null;
+    const raw = (row[valueIndex] as any) ?? null;
+
+    const xKey = JSON.stringify(x);
+    const yKey = JSON.stringify(y);
+    if (!xValueByKey.has(xKey)) {
+      xValueByKey.set(xKey, x);
+      xOrder.push(xKey);
+    }
+    if (!yValueByKey.has(yKey)) {
+      yValueByKey.set(yKey, y);
+      yOrder.push(yKey);
+    }
+
+    if (raw === null) {
+      cellByKey.set(`${xKey}|${yKey}`, null);
+      continue;
+    }
+
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+      return (
+        <UnknownComponentCard
+          title="Heatmap value must be numeric"
+          componentId={componentId}
+          componentType={HEATMAP_COMPONENT_TYPE}
+          schemaVersion={HEATMAP_SCHEMA_VERSION}
+          details={{ value: props.encoding.value, rowIndex, gotType: typeof raw }}
+        />
+      );
+    }
+
+    cellByKey.set(`${xKey}|${yKey}`, raw);
+    min = Math.min(min, raw);
+    max = Math.max(max, raw);
+  }
+
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    min = 0;
+    max = 0;
+  }
+
+  const height = props.options?.height;
+  const unit = props.options?.unit;
+
+  const rootSlot = applySlotProps(
+    {
+      className: props.className,
+      style: {
+        border: `1px solid ${theme.border}`,
+        borderRadius: theme.radius,
+        overflow: 'hidden',
+        background: theme.bg,
+        boxShadow: theme.shadow,
+        ...props.style,
+      },
+    },
+    slotProps?.root,
+  );
+  const { className: rootClassName, style: rootStyle, ...rootAttrs } = rootSlot;
+
+  const scrollSlot = applySlotProps({ style: { overflowX: 'auto', ...(typeof height === 'number' ? { maxHeight: height, overflowY: 'auto' as const } : {}) } }, slotProps?.grid);
+  const { className: gridClassName, style: gridStyle, ...gridAttrs } = scrollSlot;
+
+  return (
+    <div
+      className={rootClassName}
+      style={rootStyle}
+      {...(rootAttrs as any)}
+    >
+      {props.options?.title ? (
+        <div
+          {...(() => {
+            const titleSlot = applySlotProps(
+              {
+                style: {
+                  padding: `10px var(--rivu-space-3, 12px)`,
+                  fontSize: 'var(--rivu-font-size-base, 14px)',
+                  fontWeight: 750,
+                  color: theme.fg,
+                  borderBottom: `1px solid ${theme.borderMuted}`,
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  gap: 8,
+                },
+              },
+              slotProps?.title,
+            );
+            const { className, style, ...attrs } = titleSlot;
+            return { className, style, ...attrs };
+          })()}
+        >
+          {props.slots?.Title ? (
+            props.slots.Title(unit ? { title: props.options.title, unit } : { title: props.options.title })
+          ) : (
+            <>
+              <span>{hooks.renderMarkdown(props.options.title, { ...meta, path: 'options.title' })}</span>
+              {unit ? <span style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.muted }}>{unit}</span> : null}
+            </>
+          )}
+        </div>
+      ) : null}
+
+      <div
+        className={gridClassName}
+        style={gridStyle}
+        {...(gridAttrs as any)}
+      >
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fg }}>
+          <thead>
+            <tr>
+              <th
+                {...(() => {
+                  const thSlot = applySlotProps(
+                    {
+                      scope: 'col',
+                      style: {
+                        textAlign: 'left',
+                        padding: `10px var(--rivu-space-3, 12px)`,
+                        background: theme.bgMuted,
+                        borderBottom: `1px solid ${theme.border}`,
+                        color: theme.fgMuted,
+                        fontWeight: 650,
+                        whiteSpace: 'nowrap',
+                      },
+                    },
+                    slotProps?.th,
+                  );
+                  const { className, style, ...attrs } = thSlot;
+                  return { className, style, ...attrs };
+                })()}
+              >
+                {props.slots?.HeaderCell ? props.slots.HeaderCell({ kind: 'corner', label: '' }) : ''}
+              </th>
+              {xOrder.map((xKey) => {
+                const value = xValueByKey.get(xKey) ?? null;
+                const label =
+                  value === null
+                    ? ''
+                    : typeof value === 'number'
+                      ? hooks.formatNumber(value, { ...meta, path: `x[${xKey}]` })
+                      : hooks.formatValue(value, { ...meta, path: `x[${xKey}]` });
+                return (
+                  <th
+                    key={xKey}
+                    {...(() => {
+                      const thSlot = applySlotProps(
+                        {
+                          scope: 'col',
+                          style: {
+                            textAlign: 'left',
+                            padding: `10px var(--rivu-space-3, 12px)`,
+                            background: theme.bgMuted,
+                            borderBottom: `1px solid ${theme.border}`,
+                            color: theme.fgMuted,
+                            fontWeight: 650,
+                            whiteSpace: 'nowrap',
+                          },
+                        },
+                        slotProps?.th,
+                      );
+                      const { className, style, ...attrs } = thSlot;
+                      return { className, style, ...attrs };
+                    })()}
+                  >
+                    {props.slots?.HeaderCell ? props.slots.HeaderCell({ kind: 'x', label }) : label}
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+
+          <tbody>
+            {yOrder.map((yKey, yIndexOut) => {
+              const yValue = yValueByKey.get(yKey) ?? null;
+              const yLabel =
+                yValue === null
+                  ? ''
+                  : typeof yValue === 'number'
+                    ? hooks.formatNumber(yValue, { ...meta, path: `y[${yKey}]` })
+                    : hooks.formatValue(yValue, { ...meta, path: `y[${yKey}]` });
+
+              return (
+                <tr key={yKey}>
+                  <th
+                    {...(() => {
+                      const thSlot = applySlotProps(
+                        {
+                          scope: 'row',
+                          style: {
+                            textAlign: 'left',
+                            padding: `10px var(--rivu-space-3, 12px)`,
+                            borderBottom: `1px solid ${theme.borderMuted}`,
+                            background: theme.bgSubtle,
+                            color: theme.fg,
+                            fontWeight: 650,
+                            whiteSpace: 'nowrap',
+                          },
+                        },
+                        slotProps?.th,
+                      );
+                      const { className, style, ...attrs } = thSlot;
+                      return { className, style, ...attrs };
+                    })()}
+                  >
+                    {props.slots?.HeaderCell ? props.slots.HeaderCell({ kind: 'y', label: yLabel }) : yLabel}
+                  </th>
+
+                  {xOrder.map((xKey, xIndexOut) => {
+                    const value = cellByKey.get(`${xKey}|${yKey}`) ?? null;
+                    const t = value === null || max === min ? (value === null ? 0 : 1) : Math.max(0, Math.min(1, (value - min) / (max - min)));
+                    const formatted =
+                      value === null
+                        ? ''
+                        : hooks.formatNumber(value, { ...meta, path: `heatmap[${xIndexOut}][${yIndexOut}]`, ...(unit ? { unit } : {}) });
+
+                    return (
+                      <td
+                        key={`${xKey}|${yKey}`}
+                        {...(() => {
+                          const tdSlot = applySlotProps(
+                            {
+                              style: {
+                                padding: 0,
+                                borderBottom: `1px solid ${theme.borderMuted}`,
+                                borderLeft: `1px solid ${theme.borderMuted}`,
+                                whiteSpace: 'nowrap',
+                              },
+                            },
+                            slotProps?.td,
+                          );
+                          const { className, style, ...attrs } = tdSlot;
+                          return { className, style, ...attrs };
+                        })()}
+                      >
+                        <div
+                          {...(() => {
+                            const cellSlot = applySlotProps(
+                              {
+                                style: {
+                                  position: 'relative',
+                                  padding: `8px var(--rivu-space-3, 12px)`,
+                                  minWidth: 88,
+                                  fontVariantNumeric: 'tabular-nums',
+                                  textAlign: 'right',
+                                },
+                              },
+                              slotProps?.cell,
+                            );
+                            const { className, style, ...attrs } = cellSlot;
+                            return { className, style, ...attrs };
+                          })()}
+                        >
+                          <div
+                            style={{
+                              position: 'absolute',
+                              inset: 0,
+                              background: value === null ? theme.bgSubtle : theme.chart2,
+                            }}
+                          />
+                          {value === null ? null : (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                inset: 0,
+                                background: theme.chart1,
+                                opacity: t,
+                              }}
+                            />
+                          )}
+                          <div style={{ position: 'relative' }}>
+                            {props.slots?.Cell ? props.slots.Cell({ value, formatted, xIndex: xIndexOut, yIndex: yIndexOut }) : formatted}
+                          </div>
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export const heatmapRegistrationV1: RivuComponentRegistration<HeatmapPropsV1> = {
+  schemaVersion: HEATMAP_SCHEMA_VERSION,
+  propsSchema: heatmapPropsV1Schema,
+  render: ({ kernel, host, componentId, componentType, schemaVersion, props }) => {
+    if (props.dataRef) {
+      const datasetId = props.dataRef.datasetId;
+      const dataset = selectUiDatasetV1(kernel.getState(), datasetId);
+      if (!dataset) {
+        return (
+          <UnknownComponentCard
+            title="Dataset not found"
+            componentId={componentId}
+            componentType={componentType}
+            schemaVersion={schemaVersion}
+            details={{ datasetId }}
+          />
+        );
+      }
+
+      const required = [props.encoding.x, props.encoding.y, props.encoding.value];
+      const columns = new Set(dataset.columns);
+      const missingColumns = required.filter((name) => !columns.has(name));
+      if (missingColumns.length > 0) {
+        return (
+          <UnknownComponentCard
+            title="Dataset column mismatch"
+            componentId={componentId}
+            componentType={componentType}
+            schemaVersion={schemaVersion}
+            details={{ datasetId, missingColumns, datasetColumns: dataset.columns }}
+          />
+        );
+      }
+
+      const valueIndex = dataset.columns.indexOf(props.encoding.value);
+      for (const [rowIndex, row] of dataset.rows.entries()) {
+        const cell = (row[valueIndex] as any) ?? null;
+        if (cell === null) continue;
+        if (typeof cell === 'number' && Number.isFinite(cell)) continue;
+        return (
+          <UnknownComponentCard
+            title="Heatmap value must be numeric"
+            componentId={componentId}
+            componentType={componentType}
+            schemaVersion={schemaVersion}
+            details={{ datasetId, value: props.encoding.value, rowIndex, gotType: typeof cell }}
+          />
+        );
+      }
+
+      return <Heatmap host={host} componentId={componentId} {...props} data={dataset as any} />;
+    }
+
+    return <Heatmap host={host} componentId={componentId} {...props} />;
+  },
+};
+
 export const BAR_CHART_COMPONENT_TYPE = 'BarChart' as const;
 export const BAR_CHART_SCHEMA_VERSION = 1 as const;
 export const barChartPropsV1Schema = z
@@ -695,6 +1701,8 @@ export const viewerRegistryV1 = {
   [REPORT_SECTION_COMPONENT_TYPE]: reportSectionRegistrationV1,
   [METRIC_CARD_COMPONENT_TYPE]: metricCardRegistrationV1,
   [DATA_TABLE_COMPONENT_TYPE]: dataTableRegistrationV1,
+  [PIVOT_TABLE_COMPONENT_TYPE]: pivotTableRegistrationV1,
+  [HEATMAP_COMPONENT_TYPE]: heatmapRegistrationV1,
   [CHART_COMPONENT_TYPE]: chartRegistrationV1,
   [BAR_CHART_COMPONENT_TYPE]: barChartRegistrationV1,
   [LINE_CHART_COMPONENT_TYPE]: lineChartRegistrationV1,
