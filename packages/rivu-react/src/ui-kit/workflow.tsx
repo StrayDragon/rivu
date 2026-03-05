@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { z } from 'zod';
 
 import type { RivuKernel } from 'rivu-kernel';
@@ -7,6 +7,21 @@ import { UI_V1_EVENT_NAME, type UiV1CustomEvent } from 'rivu-ui-spec';
 
 import { createClientRequestId } from '../client-request-id.js';
 import type { RivuComponentRegistration, RivuComponentRegistry } from '../registry.js';
+
+const theme = {
+  bg: 'var(--rivu-bg, #fff)',
+  bgSubtle: 'var(--rivu-bg-subtle, #f3f4f6)',
+  fg: 'var(--rivu-fg, #111827)',
+  fgMuted: 'var(--rivu-fg-muted, #4b5563)',
+  muted: 'var(--rivu-muted, #6b7280)',
+  border: 'var(--rivu-border, #e5e7eb)',
+  radius: 'var(--rivu-radius, 14px)',
+  radiusSm: 'var(--rivu-radius-sm, 10px)',
+  shadow: 'var(--rivu-shadow, none)',
+  chart1: 'var(--rivu-chart-1, #2563eb)',
+  chart2: 'var(--rivu-chart-2, #065f46)',
+  chart4: 'var(--rivu-chart-4, #991b1b)',
+} as const;
 
 export const APPROVAL_CARD_COMPONENT_TYPE = 'ApprovalCard' as const;
 export const APPROVAL_CARD_SCHEMA_VERSION = 1 as const;
@@ -35,16 +50,39 @@ export type ApprovalCardStateV1 = z.output<typeof approvalCardStateV1Schema>;
 function buttonStyle(kind: 'primary' | 'danger' | 'default'): CSSProperties {
   const base: CSSProperties = {
     padding: '8px 12px',
-    borderRadius: 10,
+    borderRadius: theme.radiusSm,
     border: '1px solid transparent',
     fontSize: 12,
     fontWeight: 600,
     cursor: 'pointer',
   };
-  if (kind === 'primary') return { ...base, background: '#2563eb', color: '#fff' };
-  if (kind === 'danger') return { ...base, background: '#fee2e2', borderColor: '#fecaca', color: '#991b1b' };
-  return { ...base, background: '#f3f4f6', color: '#111827' };
+  if (kind === 'primary') return { ...base, background: theme.chart1, color: '#fff' };
+  if (kind === 'danger') {
+    return {
+      ...base,
+      background: 'var(--rivu-danger-bg, #fee2e2)',
+      borderColor: 'var(--rivu-danger-border, #fecaca)',
+      color: theme.chart4,
+    };
+  }
+  return { ...base, background: theme.bgSubtle, color: theme.fg };
 }
+
+export type ApprovalCardSlots = {
+  Status?: (args: {
+    status: ApprovalCardStateV1['status'];
+    decidedBy?: string;
+    decidedAtMs?: number;
+  }) => ReactNode;
+  Actions?: (args: {
+    disabled: boolean;
+    sending: 'approve' | 'deny' | null;
+    approveLabel: string;
+    denyLabel: string;
+    onApprove: () => void;
+    onDeny: () => void;
+  }) => ReactNode;
+};
 
 export function ApprovalCard(
   props: ApprovalCardPropsV1 & {
@@ -52,6 +90,9 @@ export function ApprovalCard(
     componentId: string;
     revision: number;
     state: ApprovalCardStateV1 | undefined;
+    className?: string;
+    style?: CSSProperties;
+    slots?: ApprovalCardSlots;
   },
 ) {
   const status = props.state?.status ?? 'pending';
@@ -88,47 +129,74 @@ export function ApprovalCard(
     }
   };
 
-  return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, background: '#fff' }}>
-      <div style={{ fontWeight: 650, fontSize: 14, color: '#111827' }}>{props.title}</div>
-      {props.description ? <div style={{ marginTop: 6, fontSize: 12, color: '#4b5563' }}>{props.description}</div> : null}
-
-      <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ fontSize: 12, color: '#374151' }}>
-          status:{' '}
-          <span style={{ fontWeight: 650, color: status === 'approved' ? '#065f46' : status === 'denied' ? '#991b1b' : '#374151' }}>
-            {status}
-          </span>
-        </div>
-        {props.state?.decidedBy ? <div style={{ fontSize: 12, color: '#6b7280' }}>by {props.state.decidedBy}</div> : null}
-        {typeof props.state?.decidedAtMs === 'number' ? (
-          <div style={{ fontSize: 12, color: '#6b7280' }}>{new Date(props.state.decidedAtMs).toLocaleString()}</div>
-        ) : null}
+  const statusNode = props.slots?.Status ? (
+    props.slots.Status({
+      status,
+      ...(typeof props.state?.decidedBy === 'string' ? { decidedBy: props.state.decidedBy } : {}),
+      ...(typeof props.state?.decidedAtMs === 'number' ? { decidedAtMs: props.state.decidedAtMs } : {}),
+    })
+  ) : (
+    <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ fontSize: 12, color: 'var(--rivu-fg-muted, #374151)' }}>
+        status:{' '}
+        <span style={{ fontWeight: 650, color: status === 'approved' ? theme.chart2 : status === 'denied' ? theme.chart4 : 'var(--rivu-fg-muted, #374151)' }}>
+          {status}
+        </span>
       </div>
-
-      {props.state?.message ? <div style={{ marginTop: 8, fontSize: 12, color: '#4b5563' }}>{props.state.message}</div> : null}
-      {localError ? <div style={{ marginTop: 8, fontSize: 12, color: '#991b1b' }}>{localError}</div> : null}
-
-      {status === 'pending' ? (
-        <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
-          <button
-            type="button"
-            style={{ ...buttonStyle('primary'), opacity: disabled || sending ? 0.7 : 1 }}
-            disabled={disabled || !!sending}
-            onClick={() => void sendEvent('approve')}
-          >
-            {sending === 'approve' ? 'Approving…' : props.approveLabel ?? 'Approve'}
-          </button>
-          <button
-            type="button"
-            style={{ ...buttonStyle('danger'), opacity: disabled || sending ? 0.7 : 1 }}
-            disabled={disabled || !!sending}
-            onClick={() => void sendEvent('deny')}
-          >
-            {sending === 'deny' ? 'Denying…' : props.denyLabel ?? 'Deny'}
-          </button>
-        </div>
+      {props.state?.decidedBy ? <div style={{ fontSize: 12, color: theme.muted }}>by {props.state.decidedBy}</div> : null}
+      {typeof props.state?.decidedAtMs === 'number' ? (
+        <div style={{ fontSize: 12, color: theme.muted }}>{new Date(props.state.decidedAtMs).toLocaleString()}</div>
       ) : null}
+    </div>
+  );
+
+  const actionsNode =
+    status === 'pending'
+      ? props.slots?.Actions
+        ? props.slots.Actions({
+            disabled: disabled || !!sending,
+            sending,
+            approveLabel: props.approveLabel ?? 'Approve',
+            denyLabel: props.denyLabel ?? 'Deny',
+            onApprove: () => void sendEvent('approve'),
+            onDeny: () => void sendEvent('deny'),
+          })
+        : (
+            <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                style={{ ...buttonStyle('primary'), opacity: disabled || sending ? 0.7 : 1 }}
+                disabled={disabled || !!sending}
+                onClick={() => void sendEvent('approve')}
+              >
+                {sending === 'approve' ? 'Approving…' : props.approveLabel ?? 'Approve'}
+              </button>
+              <button
+                type="button"
+                style={{ ...buttonStyle('danger'), opacity: disabled || sending ? 0.7 : 1 }}
+                disabled={disabled || !!sending}
+                onClick={() => void sendEvent('deny')}
+              >
+                {sending === 'deny' ? 'Denying…' : props.denyLabel ?? 'Deny'}
+              </button>
+            </div>
+          )
+      : null;
+
+  return (
+    <div
+      className={props.className}
+      style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radius, padding: 14, background: theme.bg, boxShadow: theme.shadow, ...props.style }}
+    >
+      <div style={{ fontWeight: 650, fontSize: 14, color: theme.fg }}>{props.title}</div>
+      {props.description ? <div style={{ marginTop: 6, fontSize: 12, color: theme.fgMuted }}>{props.description}</div> : null}
+
+      {statusNode}
+
+      {props.state?.message ? <div style={{ marginTop: 8, fontSize: 12, color: theme.fgMuted }}>{props.state.message}</div> : null}
+      {localError ? <div style={{ marginTop: 8, fontSize: 12, color: theme.chart4 }}>{localError}</div> : null}
+
+      {actionsNode}
     </div>
   );
 }
@@ -186,6 +254,11 @@ export const formCardStateV1Schema = z
   .passthrough();
 export type FormCardStateV1 = z.output<typeof formCardStateV1Schema>;
 
+export type FormCardSlots = {
+  Status?: (args: { status?: FormCardStateV1['status']; localError: string | null }) => ReactNode;
+  Actions?: (args: { disabled: boolean; status?: FormCardStateV1['status']; label: string; onSubmit: () => void }) => ReactNode;
+};
+
 function normalizeValue(raw: string, type: z.output<typeof formFieldTypeSchema>): string | number | null {
   if (type === 'number') {
     const trimmed = raw.trim();
@@ -206,6 +279,9 @@ export function FormCard(
     componentId: string;
     revision: number;
     state: FormCardStateV1 | undefined;
+    className?: string;
+    style?: CSSProperties;
+    slots?: FormCardSlots;
   },
 ) {
   const disabled = props.state?.disabled === true || props.state?.status === 'submitting';
@@ -261,10 +337,21 @@ export function FormCard(
     }
   };
 
+  const statusNode = props.slots?.Status
+    ? props.slots.Status({
+        localError,
+        ...(typeof props.state?.status === 'string' ? { status: props.state.status } : {}),
+      })
+    : null;
+  const submitLabel = props.submitLabel ?? (props.state?.status === 'submitting' ? 'Submitting…' : 'Submit');
+
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, background: '#fff' }}>
-      <div style={{ fontWeight: 650, fontSize: 14, color: '#111827' }}>{props.title}</div>
-      {props.description ? <div style={{ marginTop: 6, fontSize: 12, color: '#4b5563' }}>{props.description}</div> : null}
+    <div
+      className={props.className}
+      style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radius, padding: 14, background: theme.bg, boxShadow: theme.shadow, ...props.style }}
+    >
+      <div style={{ fontWeight: 650, fontSize: 14, color: theme.fg }}>{props.title}</div>
+      {props.description ? <div style={{ marginTop: 6, fontSize: 12, color: theme.fgMuted }}>{props.description}</div> : null}
 
       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {props.fields.map((field) => {
@@ -274,16 +361,18 @@ export function FormCard(
           const inputId = `rivu_form_${domId(props.componentId)}_${domId(field.id)}`;
           const commonStyle: CSSProperties = {
             width: '100%',
-            borderRadius: 10,
-            border: '1px solid #e5e7eb',
+            borderRadius: theme.radiusSm,
+            border: `1px solid ${theme.border}`,
             padding: '8px 10px',
             fontSize: 12,
             outline: 'none',
+            background: theme.bg,
+            color: theme.fg,
           };
 
           return (
             <div key={field.id}>
-              <label htmlFor={inputId} style={{ fontSize: 12, fontWeight: 600, color: '#111827', display: 'block' }}>
+              <label htmlFor={inputId} style={{ fontSize: 12, fontWeight: 600, color: theme.fg, display: 'block' }}>
                 {labelText}
               </label>
               <div style={{ marginTop: 6 }}>
@@ -326,23 +415,33 @@ export function FormCard(
                   />
                 )}
               </div>
-              {error ? <div style={{ marginTop: 6, fontSize: 12, color: '#991b1b' }}>{error}</div> : null}
+              {error ? <div style={{ marginTop: 6, fontSize: 12, color: theme.chart4 }}>{error}</div> : null}
             </div>
           );
         })}
       </div>
 
-      {localError ? <div style={{ marginTop: 10, fontSize: 12, color: '#991b1b' }}>{localError}</div> : null}
+      {statusNode}
+      {!props.slots?.Status && localError ? <div style={{ marginTop: 10, fontSize: 12, color: theme.chart4 }}>{localError}</div> : null}
 
       <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
-        <button
-          type="button"
-          style={{ ...buttonStyle('primary'), opacity: disabled ? 0.7 : 1 }}
-          disabled={disabled}
-          onClick={() => void onSubmit()}
-        >
-          {props.submitLabel ?? (props.state?.status === 'submitting' ? 'Submitting…' : 'Submit')}
-        </button>
+        {props.slots?.Actions ? (
+          props.slots.Actions({
+            disabled,
+            label: submitLabel,
+            onSubmit: () => void onSubmit(),
+            ...(typeof props.state?.status === 'string' ? { status: props.state.status } : {}),
+          })
+        ) : (
+          <button
+            type="button"
+            style={{ ...buttonStyle('primary'), opacity: disabled ? 0.7 : 1 }}
+            disabled={disabled}
+            onClick={() => void onSubmit()}
+          >
+            {submitLabel}
+          </button>
+        )}
       </div>
     </div>
   );

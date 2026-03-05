@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { createKernel, selectMountedUiComponentsV1, type RivuKernel } from 'rivu-kernel';
-import { ComponentRenderer, createRegistry, ProtocolInspector, useKernelState, viewerRegistryV1, workflowRegistryV1 } from 'rivu-react';
+import {
+  ComponentRenderer,
+  DATA_TABLE_COMPONENT_TYPE,
+  DataTable,
+  ProtocolInspector,
+  createRegistry,
+  dataTableRegistrationV1,
+  useKernelState,
+  viewerRegistryV1,
+  workflowRegistryV1,
+} from 'rivu-react';
 
 import { DEMO_MESSAGE_IDS, createBootstrapEnvelopes, createInitialSharedState } from './demo-fixtures.js';
 import { createMockServer } from './mock-server.js';
@@ -70,10 +80,80 @@ function SidebarMounts(props: { kernel: RivuKernel; registry: ReturnType<typeof 
 }
 
 export function App() {
-  const registry = useMemo(() => createRegistry({ ...viewerRegistryV1, ...workflowRegistryV1 }), []);
+  const registry = useMemo(
+    () =>
+      createRegistry({
+        ...viewerRegistryV1,
+        ...workflowRegistryV1,
+        [DATA_TABLE_COMPONENT_TYPE]: {
+          ...dataTableRegistrationV1,
+          render: ({ props }) => (
+            <DataTable
+              {...props}
+              slots={{
+                EmptyState: () => (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ fontWeight: 750 }}>Custom empty state</div>
+                    <div style={{ fontSize: 12, opacity: 0.85 }}>Rendered via `slots.EmptyState` (host-side override).</div>
+                  </div>
+                ),
+                Cell: ({ value, column }) => {
+                  if (value === null) return '';
+                  if (column.key === 'amount' && typeof value === 'number') {
+                    return value.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+                  }
+                  if (typeof value === 'number') return value.toLocaleString();
+                  return value;
+                },
+              }}
+            />
+          ),
+        },
+      }),
+    [],
+  );
 
   const [resetKey, setResetKey] = useState(0);
   const [showInspector, setShowInspector] = useState(true);
+  const [theme, setTheme] = useState<'default' | 'brand' | 'dark'>('default');
+
+  const themeVars: Record<string, string> | undefined = useMemo(() => {
+    if (theme === 'default') return undefined;
+    if (theme === 'brand') {
+      return {
+        '--rivu-border': '#c4b5fd',
+        '--rivu-border-muted': '#ddd6fe',
+        '--rivu-bg-muted': '#faf5ff',
+        '--rivu-shadow': '0 1px 2px rgba(0,0,0,0.06)',
+        '--rivu-chart-1': '#7c3aed',
+        '--rivu-chart-2': '#0f766e',
+        '--rivu-chart-3': '#f59e0b',
+        '--rivu-chart-4': '#be123c',
+      };
+    }
+    return {
+      colorScheme: 'dark',
+      '--rivu-bg': '#0b1220',
+      '--rivu-bg-muted': '#0f172a',
+      '--rivu-bg-subtle': '#111827',
+      '--rivu-fg': '#e2e8f0',
+      '--rivu-fg-muted': '#cbd5e1',
+      '--rivu-muted': '#94a3b8',
+      '--rivu-border': '#334155',
+      '--rivu-border-muted': '#1f2937',
+      '--rivu-shadow': 'none',
+      '--rivu-chart-1': '#38bdf8',
+      '--rivu-chart-2': '#34d399',
+      '--rivu-chart-3': '#fbbf24',
+      '--rivu-chart-4': '#fb7185',
+      '--rivu-chart-5': '#a78bfa',
+      '--rivu-chart-6': '#22d3ee',
+      '--rivu-positive-bg': 'rgba(52, 211, 153, 0.12)',
+      '--rivu-negative-bg': 'rgba(251, 113, 133, 0.12)',
+      '--rivu-danger-bg': 'rgba(251, 113, 133, 0.2)',
+      '--rivu-danger-border': 'rgba(251, 113, 133, 0.25)',
+    };
+  }, [theme]);
 
   const { kernel, bootstrap } = useMemo(() => {
     const sharedState = createInitialSharedState();
@@ -105,11 +185,18 @@ export function App() {
   }, [bootstrap]);
 
   return (
-    <div className="app">
+    <div className="app" style={themeVars as any}>
       <div className="topbar">
         <div className="brand">Rivu React Demo</div>
         <div className="hint">Viewer + Workflow components with `sharedState.ui` mounts and a mock server-authoritative loop.</div>
         <div className="spacer" />
+        <button
+          className="btn"
+          type="button"
+          onClick={() => setTheme((t) => (t === 'default' ? 'brand' : t === 'brand' ? 'dark' : 'default'))}
+        >
+          Theme: {theme}
+        </button>
         <button className="btn" type="button" onClick={() => setShowInspector((v) => !v)}>
           {showInspector ? 'Hide' : 'Show'} Inspector
         </button>

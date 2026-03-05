@@ -4,6 +4,23 @@ import { z } from 'zod';
 
 import type { RivuComponentRegistration, RivuComponentRegistry } from '../registry.js';
 
+const theme = {
+  bg: 'var(--rivu-bg, #fff)',
+  bgMuted: 'var(--rivu-bg-muted, #fafafa)',
+  bgSubtle: 'var(--rivu-bg-subtle, #f3f4f6)',
+  fg: 'var(--rivu-fg, #111827)',
+  fgMuted: 'var(--rivu-fg-muted, #4b5563)',
+  muted: 'var(--rivu-muted, #6b7280)',
+  border: 'var(--rivu-border, #e5e7eb)',
+  borderMuted: 'var(--rivu-border-muted, #f3f4f6)',
+  radius: 'var(--rivu-radius, 14px)',
+  radiusSm: 'var(--rivu-radius-sm, 10px)',
+  shadow: 'var(--rivu-shadow, none)',
+  chart1: 'var(--rivu-chart-1, #2563eb)',
+  chart2: 'var(--rivu-chart-2, #065f46)',
+  chart4: 'var(--rivu-chart-4, #991b1b)',
+} as const;
+
 export const REPORT_SECTION_COMPONENT_TYPE = 'ReportSection' as const;
 export const REPORT_SECTION_SCHEMA_VERSION = 1 as const;
 export const reportSectionPropsV1Schema = z
@@ -14,12 +31,15 @@ export const reportSectionPropsV1Schema = z
   .strict();
 export type ReportSectionPropsV1 = z.output<typeof reportSectionPropsV1Schema>;
 
-export function ReportSection(props: ReportSectionPropsV1 & { children?: ReactNode; style?: CSSProperties }) {
+export function ReportSection(props: ReportSectionPropsV1 & { children?: ReactNode; className?: string; style?: CSSProperties }) {
   return (
-    <section style={{ border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, background: '#fff', ...props.style }}>
-      <div style={{ fontWeight: 650, fontSize: 14, color: '#111827' }}>{props.title}</div>
+    <section
+      className={props.className}
+      style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radius, padding: 14, background: theme.bg, boxShadow: theme.shadow, ...props.style }}
+    >
+      <div style={{ fontWeight: 650, fontSize: 14, color: theme.fg }}>{props.title}</div>
       {props.description ? (
-        <div style={{ marginTop: 6, fontSize: 12, color: '#4b5563', lineHeight: 1.5 }}>{props.description}</div>
+        <div style={{ marginTop: 6, fontSize: 12, color: theme.fgMuted, lineHeight: 1.5 }}>{props.description}</div>
       ) : null}
       {props.children ? <div style={{ marginTop: 10 }}>{props.children}</div> : null}
     </section>
@@ -45,29 +65,46 @@ export const metricCardPropsV1Schema = z
   .strict();
 export type MetricCardPropsV1 = z.output<typeof metricCardPropsV1Schema>;
 
-export function MetricCard(props: MetricCardPropsV1 & { style?: CSSProperties }) {
+export function MetricCard(props: MetricCardPropsV1 & { className?: string; style?: CSSProperties }) {
   const change =
     typeof props.changePercent === 'number'
       ? `${props.changePercent > 0 ? '+' : ''}${props.changePercent.toFixed(2)}%`
       : null;
-  const changeColor = typeof props.changePercent === 'number' ? (props.changePercent > 0 ? '#065f46' : props.changePercent < 0 ? '#991b1b' : '#374151') : '#374151';
-  const changeBg = typeof props.changePercent === 'number' ? (props.changePercent > 0 ? '#ecfdf5' : props.changePercent < 0 ? '#fef2f2' : '#f3f4f6') : '#f3f4f6';
+  const changeColor =
+    typeof props.changePercent === 'number'
+      ? props.changePercent > 0
+        ? theme.chart2
+        : props.changePercent < 0
+          ? theme.chart4
+          : 'var(--rivu-fg-muted, #374151)'
+      : 'var(--rivu-fg-muted, #374151)';
+  const changeBg =
+    typeof props.changePercent === 'number'
+      ? props.changePercent > 0
+        ? 'var(--rivu-positive-bg, #ecfdf5)'
+        : props.changePercent < 0
+          ? 'var(--rivu-negative-bg, #fef2f2)'
+          : theme.bgSubtle
+      : theme.bgSubtle;
 
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, background: '#fff', ...props.style }}>
-      <div style={{ fontSize: 12, color: '#4b5563' }}>{props.label}</div>
+    <div
+      className={props.className}
+      style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radius, padding: 14, background: theme.bg, boxShadow: theme.shadow, ...props.style }}
+    >
+      <div style={{ fontSize: 12, color: theme.fgMuted }}>{props.label}</div>
       <div style={{ marginTop: 6, display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color: '#111827' }}>
+        <div style={{ fontSize: 22, fontWeight: 700, color: theme.fg }}>
           {typeof props.value === 'number' ? props.value.toLocaleString() : props.value}
         </div>
-        {props.unit ? <div style={{ fontSize: 12, color: '#6b7280' }}>{props.unit}</div> : null}
+        {props.unit ? <div style={{ fontSize: 12, color: theme.muted }}>{props.unit}</div> : null}
         {change ? (
           <div style={{ marginLeft: 'auto', fontSize: 12, padding: '2px 8px', borderRadius: 999, background: changeBg, color: changeColor }}>
             {change}
           </div>
         ) : null}
       </div>
-      {props.note ? <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280', lineHeight: 1.4 }}>{props.note}</div> : null}
+      {props.note ? <div style={{ marginTop: 8, fontSize: 12, color: theme.muted, lineHeight: 1.4 }}>{props.note}</div> : null}
     </div>
   );
 }
@@ -105,16 +142,30 @@ function cellText(value: string | number | null) {
   return typeof value === 'number' ? value.toLocaleString() : value;
 }
 
-export function DataTable(props: DataTablePropsV1 & { style?: CSSProperties }) {
+export type DataTableSlots = {
+  Cell?: (args: {
+    value: string | number | null;
+    column: DataTablePropsV1['columns'][number];
+    row: DataTablePropsV1['rows'][number];
+    rowIndex: number;
+    columnIndex: number;
+  }) => ReactNode;
+  EmptyState?: (args: { caption?: string; columns: DataTablePropsV1['columns'] }) => ReactNode;
+};
+
+export function DataTable(props: DataTablePropsV1 & { className?: string; style?: CSSProperties; slots?: DataTableSlots }) {
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 14, overflow: 'hidden', background: '#fff', ...props.style }}>
+    <div
+      className={props.className}
+      style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radius, overflow: 'hidden', background: theme.bg, boxShadow: theme.shadow, ...props.style }}
+    >
       {props.caption ? (
-        <div style={{ padding: '10px 12px', fontSize: 12, color: '#4b5563', borderBottom: '1px solid #f3f4f6' }}>
+        <div style={{ padding: '10px 12px', fontSize: 12, color: theme.fgMuted, borderBottom: `1px solid ${theme.borderMuted}` }}>
           {props.caption}
         </div>
       ) : null}
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, color: '#111827' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, color: theme.fg }}>
           <thead>
             <tr>
               {props.columns.map((col) => (
@@ -123,9 +174,9 @@ export function DataTable(props: DataTablePropsV1 & { style?: CSSProperties }) {
                   style={{
                     textAlign: col.align ?? 'left',
                     padding: '10px 12px',
-                    background: '#fafafa',
-                    borderBottom: '1px solid #e5e7eb',
-                    color: '#374151',
+                    background: theme.bgMuted,
+                    borderBottom: `1px solid ${theme.border}`,
+                    color: 'var(--rivu-fg-muted, #374151)',
                     fontWeight: 650,
                     whiteSpace: 'nowrap',
                   }}
@@ -138,26 +189,38 @@ export function DataTable(props: DataTablePropsV1 & { style?: CSSProperties }) {
           <tbody>
             {props.rows.map((row, rowIndex) => (
               <tr key={rowIndex}>
-                {props.columns.map((col) => (
+                {props.columns.map((col, columnIndex) => (
                   <td
                     key={col.key}
                     style={{
                       textAlign: col.align ?? 'left',
                       padding: '10px 12px',
-                      borderBottom: '1px solid #f3f4f6',
+                      borderBottom: `1px solid ${theme.borderMuted}`,
                       whiteSpace: 'nowrap',
-                      color: '#111827',
+                      color: theme.fg,
                     }}
                   >
-                    {cellText((row[col.key] as any) ?? null)}
+                    {props.slots?.Cell
+                      ? props.slots.Cell({
+                          value: (row[col.key] as any) ?? null,
+                          column: col,
+                          row,
+                          rowIndex,
+                          columnIndex,
+                        })
+                      : cellText((row[col.key] as any) ?? null)}
                   </td>
                 ))}
               </tr>
             ))}
             {props.rows.length === 0 ? (
               <tr>
-                <td colSpan={props.columns.length} style={{ padding: '14px 12px', color: '#6b7280', textAlign: 'center' }}>
-                  No data
+                <td colSpan={props.columns.length} style={{ padding: '14px 12px', color: theme.muted, textAlign: 'center' }}>
+                  {props.slots?.EmptyState
+                    ? props.slots.EmptyState(
+                        typeof props.caption === 'string' ? { caption: props.caption, columns: props.columns } : { columns: props.columns },
+                      )
+                    : 'No data'}
                 </td>
               </tr>
             ) : null}
@@ -185,30 +248,33 @@ export const barChartPropsV1Schema = z
   .strict();
 export type BarChartPropsV1 = z.output<typeof barChartPropsV1Schema>;
 
-export function BarChart(props: BarChartPropsV1 & { style?: CSSProperties }) {
+export function BarChart(props: BarChartPropsV1 & { className?: string; style?: CSSProperties }) {
   const max = Math.max(0, ...props.items.map((i) => i.value));
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, background: '#fff', ...props.style }}>
-      {props.title ? <div style={{ fontWeight: 650, fontSize: 13, color: '#111827' }}>{props.title}</div> : null}
+    <div
+      className={props.className}
+      style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radius, padding: 14, background: theme.bg, boxShadow: theme.shadow, ...props.style }}
+    >
+      {props.title ? <div style={{ fontWeight: 650, fontSize: 13, color: theme.fg }}>{props.title}</div> : null}
       <div style={{ marginTop: props.title ? 10 : 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {props.items.map((item) => {
           const pct = max > 0 ? Math.max(0, Math.min(1, item.value / max)) : 0;
           return (
             <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr auto', gap: 10, alignItems: 'center' }}>
-              <div style={{ fontSize: 12, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 12, color: 'var(--rivu-fg-muted, #374151)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {item.label}
               </div>
-              <div style={{ height: 10, borderRadius: 999, background: '#f3f4f6', overflow: 'hidden' }}>
-                <div style={{ width: `${pct * 100}%`, height: '100%', background: '#2563eb' }} />
+              <div style={{ height: 10, borderRadius: 999, background: theme.bgSubtle, overflow: 'hidden' }}>
+                <div style={{ width: `${pct * 100}%`, height: '100%', background: theme.chart1 }} />
               </div>
-              <div style={{ fontSize: 12, color: '#111827', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ fontSize: 12, color: theme.fg, fontVariantNumeric: 'tabular-nums' }}>
                 {item.value.toLocaleString()}
-                {props.unit ? <span style={{ color: '#6b7280' }}> {props.unit}</span> : null}
+                {props.unit ? <span style={{ color: theme.muted }}> {props.unit}</span> : null}
               </div>
             </div>
           );
         })}
-        {props.items.length === 0 ? <div style={{ fontSize: 12, color: '#6b7280' }}>No data</div> : null}
+        {props.items.length === 0 ? <div style={{ fontSize: 12, color: theme.muted }}>No data</div> : null}
       </div>
     </div>
   );
@@ -238,7 +304,7 @@ function linePath(points: Array<{ x: number; y: number }>) {
     .join(' ');
 }
 
-export function LineChart(props: LineChartPropsV1 & { style?: CSSProperties }) {
+export function LineChart(props: LineChartPropsV1 & { className?: string; style?: CSSProperties }) {
   const width = 520;
   const height = 160;
   const pad = 18;
@@ -254,8 +320,11 @@ export function LineChart(props: LineChartPropsV1 & { style?: CSSProperties }) {
   });
 
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, background: '#fff', ...props.style }}>
-      {props.title ? <div style={{ fontWeight: 650, fontSize: 13, color: '#111827' }}>{props.title}</div> : null}
+    <div
+      className={props.className}
+      style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radius, padding: 14, background: theme.bg, boxShadow: theme.shadow, ...props.style }}
+    >
+      {props.title ? <div style={{ fontWeight: 650, fontSize: 13, color: theme.fg }}>{props.title}</div> : null}
       <svg
         viewBox={`0 0 ${width} ${height}`}
         width="100%"
@@ -264,16 +333,16 @@ export function LineChart(props: LineChartPropsV1 & { style?: CSSProperties }) {
         role="img"
         aria-label={props.title ?? 'Line chart'}
       >
-        <path d={linePath(pts)} fill="none" stroke="#2563eb" strokeWidth={2.5} />
+        <path d={linePath(pts)} fill="none" stroke={theme.chart1} strokeWidth={2.5} />
         {pts.map((p, idx) => (
-          <circle key={idx} cx={p.x} cy={p.y} r={3} fill="#2563eb" />
+          <circle key={idx} cx={p.x} cy={p.y} r={3} fill={theme.chart1} />
         ))}
       </svg>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: '#6b7280' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, color: theme.muted }}>
         <span>{props.points[0]?.x}</span>
         <span>{props.points[props.points.length - 1]?.x}</span>
       </div>
-      <div style={{ marginTop: 4, fontSize: 11, color: '#6b7280' }}>
+      <div style={{ marginTop: 4, fontSize: 11, color: theme.muted }}>
         range: {minY.toLocaleString()} - {maxY.toLocaleString()}
         {props.unit ? ` ${props.unit}` : ''}
       </div>
@@ -316,32 +385,40 @@ function safeUrl(raw: string): string | null {
   }
 }
 
-export function CitationList(props: CitationListPropsV1 & { style?: CSSProperties }) {
+export function CitationList(props: CitationListPropsV1 & { className?: string; style?: CSSProperties }) {
   return (
-    <div style={{ border: '1px solid #e5e7eb', borderRadius: 14, padding: 14, background: '#fff', ...props.style }}>
-      <div style={{ fontWeight: 650, fontSize: 13, color: '#111827' }}>{props.title ?? 'Citations'}</div>
+    <div
+      className={props.className}
+      style={{ border: `1px solid ${theme.border}`, borderRadius: theme.radius, padding: 14, background: theme.bg, boxShadow: theme.shadow, ...props.style }}
+    >
+      <div style={{ fontWeight: 650, fontSize: 13, color: theme.fg }}>{props.title ?? 'Citations'}</div>
       <ol style={{ marginTop: 10, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {props.items.map((item, idx) => {
           const href = item.url ? safeUrl(item.url) : null;
           return (
-            <li key={idx} style={{ fontSize: 12, color: '#111827' }}>
+            <li key={idx} style={{ fontSize: 12, color: theme.fg }}>
               <div style={{ fontWeight: 600 }}>
                 {href ? (
-                  <a href={href} target="_blank" rel="noreferrer" style={{ color: '#1d4ed8', textDecoration: 'none' }}>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: `var(--rivu-chart-1, #1d4ed8)`, textDecoration: 'none' }}
+                  >
                     {item.title}
                   </a>
                 ) : (
                   <span>{item.title}</span>
                 )}
               </div>
-              {item.snippet ? <div style={{ marginTop: 4, color: '#4b5563', lineHeight: 1.4 }}>{item.snippet}</div> : null}
+              {item.snippet ? <div style={{ marginTop: 4, color: theme.fgMuted, lineHeight: 1.4 }}>{item.snippet}</div> : null}
               {item.url && !href ? (
-                <div style={{ marginTop: 4, color: '#991b1b' }}>Blocked URL</div>
+                <div style={{ marginTop: 4, color: theme.chart4 }}>Blocked URL</div>
               ) : null}
             </li>
           );
         })}
-        {props.items.length === 0 ? <li style={{ fontSize: 12, color: '#6b7280' }}>No citations</li> : null}
+        {props.items.length === 0 ? <li style={{ fontSize: 12, color: theme.muted }}>No citations</li> : null}
       </ol>
     </div>
   );
@@ -361,4 +438,3 @@ export const viewerRegistryV1 = {
   [LINE_CHART_COMPONENT_TYPE]: lineChartRegistrationV1,
   [CITATION_LIST_COMPONENT_TYPE]: citationListRegistrationV1,
 } satisfies RivuComponentRegistry;
-

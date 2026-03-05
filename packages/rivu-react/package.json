@@ -2,7 +2,7 @@
   "name": "rivu-react",
   "version": "0.1.0",
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": ["./dist/tokens.css"],
   "files": ["dist"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,10 +10,11 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./tokens.css": "./dist/tokens.css"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node -e \"require('fs').copyFileSync('src/tokens.css','dist/tokens.css')\"",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

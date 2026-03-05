@@ -53,6 +53,21 @@ export function createInitialSharedState() {
           revision: 0,
           mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 2 }],
         },
+        cmp_table_empty: {
+          type: 'DataTable',
+          schemaVersion: 1,
+          props: {
+            caption: 'DataTable (empty state demo)',
+            columns: [
+              { key: 'name', label: 'Customer' },
+              { key: 'orders', label: 'Orders', align: 'right' },
+              { key: 'amount', label: 'Amount', align: 'right' },
+            ],
+            rows: [],
+          },
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 3 }],
+        },
         cmp_bar_chart: {
           type: 'BarChart',
           schemaVersion: 1,
@@ -67,7 +82,7 @@ export function createInitialSharedState() {
             ],
           },
           revision: 0,
-          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 3 }],
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 4 }],
         },
         cmp_line_chart: {
           type: 'LineChart',
