@@ -9,6 +9,8 @@ import {
   buildUiV1Capabilities,
   createRegistry,
   dataTableRegistrationV1,
+  exportChartSvgsV1,
+  exportHtmlV1,
   useKernelState,
   viewerRegistryV1,
   workflowRegistryV1,
@@ -77,6 +79,120 @@ function SidebarMounts(props: { kernel: RivuKernel; registry: ReturnType<typeof 
         <div className="hint">No sidebar mounts for this message.</div>
       )}
     </div>
+  );
+}
+
+function downloadText(filename: string, text: string, mime: string) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function ExportMenu(props: { kernel: RivuKernel; registry: ReturnType<typeof createRegistry> }) {
+  return (
+    <details style={{ position: 'relative' }}>
+      <summary className="btn" style={{ listStyle: 'none' }}>
+        Export
+      </summary>
+      <div
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: 'calc(100% + 8px)',
+          zIndex: 50,
+          minWidth: 220,
+          padding: 10,
+          borderRadius: 12,
+          border: '1px solid var(--rivu-border, #e5e7eb)',
+          background: 'var(--rivu-bg, #fff)',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <button
+          className="btn"
+          type="button"
+          onClick={() => {
+            const state = props.kernel.getState();
+            const snapshot = {
+              schema: 'rivu.export.v1',
+              exportedAtMs: Date.now(),
+              lastSeq: state.lastSeq,
+              sharedState: state.sharedState,
+              messages: state.messageOrder.map((id) => state.messages[id]).filter(Boolean),
+              toolCalls: state.toolCallOrder.map((id) => state.toolCalls[id]).filter(Boolean),
+            };
+            downloadText('rivu-export.json', JSON.stringify(snapshot, null, 2), 'application/json');
+          }}
+        >
+          Download JSON
+        </button>
+
+        <button
+          className="btn"
+          type="button"
+          onClick={() => {
+            const state = props.kernel.getState();
+            const snapshot = {
+              schema: 'rivu.export.v1',
+              exportedAtMs: Date.now(),
+              lastSeq: state.lastSeq,
+              sharedState: state.sharedState,
+              messages: state.messageOrder
+                .map((id) => state.messages[id])
+                .filter(Boolean)
+                .map((m) => ({ id: m!.id, role: m!.role, content: m!.content, status: m!.status })),
+              toolCalls: state.toolCallOrder
+                .map((id) => state.toolCalls[id])
+                .filter(Boolean)
+                .map((t) => ({
+                  id: t!.id,
+                  name: t!.name,
+                  args: t!.args,
+                  status: t!.status,
+                  parentMessageId: t!.parentMessageId,
+                  resultMessageId: t!.resultMessageId,
+                })),
+            };
+
+            const html = exportHtmlV1({ snapshot, registry: props.registry, title: 'Rivu Viewer Export (Demo)' });
+            downloadText('rivu-export.html', html, 'text/html');
+          }}
+        >
+          Download HTML
+        </button>
+
+        <button
+          className="btn"
+          type="button"
+          onClick={() => {
+            const state = props.kernel.getState();
+            const snapshot = {
+              schema: 'rivu.export.v1',
+              exportedAtMs: Date.now(),
+              lastSeq: state.lastSeq,
+              sharedState: state.sharedState,
+              messages: [],
+              toolCalls: [],
+            };
+
+            const svgs = exportChartSvgsV1({ snapshot: snapshot as any, registry: props.registry });
+            const first = Object.entries(svgs)[0];
+            if (!first) return;
+            const [componentId, svg] = first;
+            downloadText(`${componentId}.svg`, svg, 'image/svg+xml');
+          }}
+        >
+          Download SVG (Chart)
+        </button>
+      </div>
+    </details>
   );
 }
 
@@ -198,6 +314,7 @@ export function App() {
         <div className="brand">Rivu React Demo</div>
         <div className="hint">Viewer + Workflow components with `sharedState.ui` mounts and a mock server-authoritative loop.</div>
         <div className="spacer" />
+        <ExportMenu kernel={kernel} registry={registry} />
         <button
           className="btn"
           type="button"

@@ -2,9 +2,7 @@
 
 ## Purpose
 Define requirements for server-side event storage and snapshotting needed to support resume/replay and snapshot fallback.
-
 ## Requirements
-
 ### Requirement: EventStore supports append and replay by `seq`
 The system MUST provide an EventStore abstraction that can:
 - append envelopes `{ seq, event }` for a given `threadId`
@@ -40,10 +38,13 @@ The system MUST support a snapshot policy that can trigger snapshot creation bas
 - **THEN** the system creates a new snapshot and resets the budget counter
 
 ### Requirement: Export produces a stable JSON snapshot for Viewer use-cases
-The system MUST support exporting a “structured JSON snapshot” that includes, at minimum:
-- messages and tool results necessary for viewing
-- the shared state including `state.ui`
+系统 MUST 支持导出“结构化 JSON snapshot”，其至少包含：
+- 用于查看的 messages 与 tool results
+- shared state（包含 `sharedState.ui`）
+
+该 JSON snapshot MUST 可用于确定性回放 Viewer UI，并作为进一步导出格式（HTML/SVG/PDF）的输入。
 
 #### Scenario: Export can be re-rendered consistently
-- **WHEN** an exported JSON snapshot is imported into a viewer runtime
-- **THEN** the viewer can render `state.ui` deterministically and unknown components degrade gracefully
+- **WHEN** 一个导出的 JSON snapshot 被导入到 viewer runtime
+- **THEN** viewer 能确定性渲染 `sharedState.ui`，未知组件降级且页面保持可用
+

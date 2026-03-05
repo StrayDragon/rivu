@@ -105,3 +105,13 @@ React demo MUST 展示“同一份 dataset 被多个组件复用”的用法（�
 - **WHEN** demo 加载初始 `STATE_SNAPSHOT`
 - **THEN** 至少存在两个组件通过 `dataRef.datasetId` 引用同一个 `datasetId` 并成功渲染
 
+### Requirement: Demo includes an export menu for Viewer outputs
+React demo MUST 提供一个 ExportMenu（或等价 UI），至少支持导出：
+- JSON snapshot
+- HTML
+- SVG（当存在图表时）
+
+#### Scenario: Demo can export HTML
+- **WHEN** 用户在 demo 中点击导出 HTML
+- **THEN** demo 生成一份可独立打开的 HTML 导出结果
+

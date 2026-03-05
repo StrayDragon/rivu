@@ -8,6 +8,14 @@ Viewer 导出 MUST 以结构化 JSON snapshot 作为输入真值。
 - `messages`
 - `toolCalls`
 
+推荐（SHOULD）使用稳定的导出 envelope 形状（与 `docs/export-review.md` 对齐）：
+- `schema: "rivu.export.v1"`
+- `exportedAtMs: number`
+- `lastSeq: number`
+- `sharedState: object`
+- `messages: array`
+- `toolCalls: array`
+
 #### Scenario: Export consumes a snapshot
 - **WHEN** 服务拿到一个合法的导出 JSON snapshot
 - **THEN** 导出系统可在不依赖事件重放的情况下生成导出产物
@@ -17,6 +25,8 @@ HTML 导出 MUST 满足：
 - 确定性：同一输入 snapshot 多次导出结果稳定
 - 离线：导出过程 MUST NOT 发起任何外部网络请求
 - 降级：未知组件 MUST 以占位/摘要形式导出且不中断流程
+
+HTML 导出结果 SHOULD 是一份可独立打开的完整 HTML 文档（包含 `<head>/<body>`），并避免引用外部网络资源（例如 `http(s)://...`）。
 
 #### Scenario: Unknown component does not break export
 - **WHEN** snapshot 中包含未知 `component.type` 或 schemaVersion 不匹配的组件

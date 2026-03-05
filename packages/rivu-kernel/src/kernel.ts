@@ -1,5 +1,5 @@
 import { EventSchemas } from '@ag-ui/core';
-import { applyPatch } from 'fast-json-patch';
+import * as fastJsonPatch from 'fast-json-patch';
 import {
   UI_V1_EVENT_NAME,
   type UiInputLimitsV1,
@@ -7,6 +7,8 @@ import {
   uiV1EventValueSchema,
   type UiV1CustomEvent,
 } from 'rivu-ui-spec';
+
+const { applyPatch } = fastJsonPatch;
 
 export type RivuEnvelope = {
   seq: number;

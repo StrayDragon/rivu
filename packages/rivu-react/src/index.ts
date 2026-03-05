@@ -28,5 +28,9 @@ export { createClientRequestId } from './client-request-id.js';
 
 export { buildUiV1Capabilities } from './ui-v1-capabilities.js';
 
+export type { RivuExportMessageV1, RivuExportSnapshotV1, RivuExportToolCallV1 } from './viewer-export.js';
+export { exportChartSvgsV1, exportHtmlV1 } from './viewer-export.js';
+export { exportPdfV1 } from './viewer-export-pdf.js';
+
 export * from './ui-kit/viewer.js';
 export * from './ui-kit/workflow.js';
