@@ -147,6 +147,13 @@ fn now_ms() -> i64 {
         .as_millis() as i64
 }
 
+fn is_finite_number(v: &Value) -> bool {
+    match v {
+        Value::Number(n) => n.as_f64().is_some_and(|f| f.is_finite()),
+        _ => false,
+    }
+}
+
 fn apply_component_event(component: &UiComponentV1, event: &UiV1CustomEvent) -> Result<(Value, u64), UiV1EventProcessorError> {
     let mut state: Map<String, Value> = component.state.clone().unwrap_or_default();
 
@@ -169,6 +176,119 @@ fn apply_component_event(component: &UiComponentV1, event: &UiV1CustomEvent) -> 
             state.entry("decidedAtMs").or_insert_with(|| Value::Number(Number::from(now_ms())));
             Ok((Value::Object(state), component.revision + 1))
         }
+        "Chart" => match event.value.event_name.as_str() {
+            "chart.clearSelection" => {
+                state.insert("selection".into(), json!({ "kind": "none" }));
+                Ok((Value::Object(state), component.revision + 1))
+            }
+            "chart.setSelection" => {
+                let selection = event
+                    .value
+                    .payload
+                    .get("selection")
+                    .and_then(Value::as_object)
+                    .ok_or_else(|| UiV1EventProcessorError::InvalidPayload("payload.selection must be an object".into()))?;
+
+                let kind = selection.get("kind").and_then(Value::as_str).unwrap_or("");
+
+                let allowed: &[&str] = match kind {
+                    "none" => &["kind"],
+                    "point" => &["kind", "rowIndex"],
+                    "range" => &["kind", "column", "from", "to"],
+                    "series" => &["kind", "value"],
+                    _ => &[],
+                };
+                if allowed.is_empty() {
+                    return Err(UiV1EventProcessorError::InvalidPayload(
+                        "payload.selection.kind must be one of \"none\"|\"point\"|\"range\"|\"series\"".into(),
+                    ));
+                }
+                for key in selection.keys() {
+                    if !allowed.contains(&key.as_str()) {
+                        return Err(UiV1EventProcessorError::InvalidPayload(format!(
+                            "payload.selection contains unknown field: {}",
+                            key
+                        )));
+                    }
+                }
+
+                let next_selection = match kind {
+                    "none" => json!({ "kind": "none" }),
+                    "point" => {
+                        let row_index = selection.get("rowIndex").and_then(Value::as_i64).unwrap_or(-1);
+                        if row_index < 0 {
+                            return Err(UiV1EventProcessorError::InvalidPayload(
+                                "payload.selection.rowIndex must be a non-negative integer".into(),
+                            ));
+                        }
+
+                        let data = component
+                            .props
+                            .get("data")
+                            .and_then(Value::as_object)
+                            .ok_or_else(|| UiV1EventProcessorError::InvalidPayload("Chart props.data must be an object".into()))?;
+                        let rows_len = data
+                            .get("rows")
+                            .and_then(Value::as_array)
+                            .ok_or_else(|| UiV1EventProcessorError::InvalidPayload("Chart props.data.rows must be an array".into()))?
+                            .len();
+
+                        if (row_index as usize) >= rows_len {
+                            return Err(UiV1EventProcessorError::InvalidPayload(format!(
+                                "payload.selection.rowIndex out of range: rowIndex={} rows={}",
+                                row_index, rows_len
+                            )));
+                        }
+
+                        json!({ "kind": "point", "rowIndex": row_index })
+                    }
+                    "range" => {
+                        let column = selection.get("column").and_then(Value::as_str).unwrap_or("").trim();
+                        if column.is_empty() {
+                            return Err(UiV1EventProcessorError::InvalidPayload(
+                                "payload.selection.column must be a non-empty string".into(),
+                            ));
+                        }
+                        let from = selection.get("from").ok_or_else(|| {
+                            UiV1EventProcessorError::InvalidPayload("payload.selection.from must be string|number|null".into())
+                        })?;
+                        let to = selection.get("to").ok_or_else(|| {
+                            UiV1EventProcessorError::InvalidPayload("payload.selection.to must be string|number|null".into())
+                        })?;
+                        let ok_from = from.is_null() || from.is_string() || is_finite_number(from);
+                        let ok_to = to.is_null() || to.is_string() || is_finite_number(to);
+                        if !ok_from {
+                            return Err(UiV1EventProcessorError::InvalidPayload(
+                                "payload.selection.from must be string|number|null".into(),
+                            ));
+                        }
+                        if !ok_to {
+                            return Err(UiV1EventProcessorError::InvalidPayload(
+                                "payload.selection.to must be string|number|null".into(),
+                            ));
+                        }
+                        json!({ "kind": "range", "column": column, "from": from, "to": to })
+                    }
+                    "series" => {
+                        let value = selection.get("value").unwrap_or(&Value::Null);
+                        if !(value.is_string() || is_finite_number(value)) {
+                            return Err(UiV1EventProcessorError::InvalidPayload(
+                                "payload.selection.value must be string|number".into(),
+                            ));
+                        }
+                        json!({ "kind": "series", "value": value })
+                    }
+                    _ => unreachable!("allowed kinds handled above"),
+                };
+
+                state.insert("selection".into(), next_selection);
+                Ok((Value::Object(state), component.revision + 1))
+            }
+            other => Err(UiV1EventProcessorError::InvalidPayload(format!(
+                "unsupported Chart eventName: {}",
+                other
+            ))),
+        },
         "FormCard" => match event.value.event_name.as_str() {
             "setField" => {
                 let field_id = event

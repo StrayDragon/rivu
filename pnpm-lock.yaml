@@ -138,6 +138,15 @@ importers:
 
   packages/rivu-svelte:
     dependencies:
+      d3-array:
+        specifier: ^3.2.4
+        version: 3.2.4
+      d3-scale:
+        specifier: ^4.0.2
+        version: 4.0.2
+      d3-shape:
+        specifier: ^3.2.0
+        version: 3.2.0
       rivu-kernel:
         specifier: workspace:*
         version: link:../rivu-kernel

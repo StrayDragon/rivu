@@ -190,6 +190,27 @@ export function createInitialSharedState() {
           revision: 0,
           mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 1 }],
         },
+        cmp_chart_workflow: {
+          type: 'Chart',
+          schemaVersion: 1,
+          props: {
+            mark: 'bar',
+            data: {
+              columns: ['label', 'value'],
+              rows: [
+                ['Search', 34_200],
+                ['Referral', 21_100],
+                ['Direct', 17_800],
+                ['Email', 9_400],
+              ],
+            },
+            encoding: { x: 'label', y: 'value' },
+            options: { title: 'Chart (workflow interactions)', unit: 'USD', height: 240 },
+          },
+          state: { selection: { kind: 'none' } },
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 2 }],
+        },
       },
     },
   };

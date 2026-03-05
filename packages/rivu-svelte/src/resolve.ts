@@ -8,6 +8,8 @@ export type ResolveUiComponentResult =
       componentId: string;
       componentType: string;
       schemaVersion: number;
+      revision: number;
+      hasState: boolean;
       Component: RivuSvelteComponentRegistry[string]['Component'];
       props: unknown;
       state: unknown;
@@ -17,12 +19,16 @@ export type ResolveUiComponentResult =
       componentId: string;
       componentType: string;
       schemaVersion: number;
+      revision: number;
+      hasState: boolean;
     }
   | {
       status: 'error';
       componentId: string;
       componentType: string;
       schemaVersion: number;
+      revision: number;
+      hasState: boolean;
       error: any;
     }
   | { status: 'not_found' | 'unknown_type' | 'schema_mismatch' | 'invalid_props' | 'invalid_state'; details: any };
@@ -62,6 +68,8 @@ export function resolveUiComponentV1(params: {
       componentId: params.componentId,
       componentType: component.type,
       schemaVersion: component.schemaVersion,
+      revision: component.revision,
+      hasState: component.state != null,
       error: (component as any).error ?? null,
     };
   }
@@ -71,6 +79,8 @@ export function resolveUiComponentV1(params: {
       componentId: params.componentId,
       componentType: component.type,
       schemaVersion: component.schemaVersion,
+      revision: component.revision,
+      hasState: component.state != null,
     };
   }
 
@@ -178,6 +188,8 @@ export function resolveUiComponentV1(params: {
     componentId: params.componentId,
     componentType: component.type,
     schemaVersion: component.schemaVersion,
+    revision: component.revision,
+    hasState: component.state != null,
     Component: registration.Component,
     props: dataRefResolution.props,
     state: stateResult ? stateResult.data : undefined,

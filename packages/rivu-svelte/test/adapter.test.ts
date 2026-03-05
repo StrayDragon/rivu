@@ -142,9 +142,13 @@ test('resolveUiComponentV1 respects lifecycle status (unknown > error > building
 
   const building = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_building' });
   expect(building.status).toBe('building');
+  expect((building as any).revision).toBe(0);
+  expect((building as any).hasState).toBe(false);
 
   const error = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_error' });
   expect(error.status).toBe('error');
+  expect((error as any).revision).toBe(0);
+  expect((error as any).hasState).toBe(false);
 
   const unknownRegistry = createRegistry({});
   const unknownWins = resolveUiComponentV1({ state: kernel.getState(), registry: unknownRegistry, componentId: 'cmp_error' });
@@ -203,6 +207,8 @@ test('resolveUiComponentV1 resolves DataTable dataRef from sharedState.ui.datase
 
   const resolved = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_table' });
   expect(resolved.status).toBe('ok');
+  expect((resolved as any).revision).toBe(0);
+  expect((resolved as any).hasState).toBe(false);
   expect((resolved as any).props.rows).toEqual([{ name: 'Acme', orders: 12 }]);
 });
 

@@ -12,6 +12,23 @@ export { a2uiOpV1Schema, a2uiV1Schema } from './a2ui-v1.js';
 export type { ChartEncodingV1, ChartMarkV1, ChartOptionsV1, ChartPropsV1 } from './ui-chart.js';
 export { chartEncodingV1Schema, chartMarkV1Schema, chartOptionsV1Schema, chartPropsV1Schema } from './ui-chart.js';
 
+export type {
+  ChartInteractionEventNameV1,
+  ChartSelectionKindV1,
+  ChartSelectionV1,
+  ChartSelectionStateV1,
+  ChartSetSelectionPayloadV1,
+  ChartClearSelectionPayloadV1,
+} from './chart-interactions.js';
+export {
+  chartInteractionEventNameV1Schema,
+  chartSelectionKindV1Schema,
+  chartSelectionV1Schema,
+  chartSelectionStateV1Schema,
+  chartSetSelectionPayloadV1Schema,
+  chartClearSelectionPayloadV1Schema,
+} from './chart-interactions.js';
+
 export type { UiV1CustomEvent, UiV1EventValue } from './ui-v1-event.js';
 export {
   UI_V1_EVENT_NAME,

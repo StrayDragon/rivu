@@ -341,7 +341,44 @@ Both SDKs include a minimal `UiV1EventProcessor` that:
 Supported component types in the processor (MVP):
 
 - `ApprovalCard` (`approve` / `deny`)
+- `Chart` (`chart.setSelection` / `chart.clearSelection`)
 - `FormCard` (`setField` / `submit`)
+
+#### Chart interactions (`chart-interactions` v1)
+
+When `component.type="Chart"` is used in a **workflow** role (server-authoritative `state` + `revision`), the SDK processors and UI kits support a minimal interaction loop via `CUSTOM(name="ui.v1.event")`:
+
+- `eventName="chart.setSelection"` — update `component.state.selection`
+- `eventName="chart.clearSelection"` — clear selection (`kind: "none"`)
+
+Payload shapes (examples):
+
+```json
+{ "selection": { "kind": "point", "rowIndex": 3 } }
+```
+
+```json
+{ "selection": { "kind": "range", "column": "x", "from": 1, "to": 7 } }
+```
+
+```json
+{ "selection": { "kind": "series", "value": "A" } }
+```
+
+```json
+{ "selection": { "kind": "none" } }
+```
+
+Selection state shape:
+
+- `sharedState.ui.components[componentId].state.selection` mirrors the `selection` object in `chart.setSelection`.
+- On each accepted event, the server increments `sharedState.ui.components[componentId].revision`.
+- The client MUST send `baseRevision` equal to the current component `revision` to avoid conflicts.
+
+Token efficiency tips:
+
+- Do **not** duplicate rows/datum JSON in the event payload; prefer lightweight references like `rowIndex` / `range` / `series`.
+- Keep payload stable and minimal so the same processor can be reused across hosts.
 
 ### Building `sharedState.ui` patches (mount/props/state/revision)
 

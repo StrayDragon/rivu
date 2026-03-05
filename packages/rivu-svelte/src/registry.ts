@@ -1,8 +1,12 @@
 import type { ZodType } from 'zod';
 import type { Component } from 'svelte';
+import type { RivuKernel } from 'rivu-kernel';
 
 export type RivuSvelteComponentProps<TProps, TState> = {
+  kernel?: RivuKernel;
   componentId: string;
+  revision: number;
+  hasState: boolean;
   props: TProps;
   state: TState | undefined;
 };

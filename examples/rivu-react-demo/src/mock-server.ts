@@ -20,6 +20,10 @@ function nowMs() {
   return Date.now();
 }
 
+function isFiniteNumber(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+
 function assertRecord(value: unknown, message: string): asserts value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(message);
 }
@@ -137,6 +141,62 @@ export function createMockServer(params: {
       state.status = value.eventName === 'approve' ? 'approved' : 'denied';
       if (typeof state.decidedAtMs !== 'number') state.decidedAtMs = nowMs();
       state.decidedBy = 'demo-server';
+    } else if (componentType === 'Chart') {
+      if (value.eventName === 'chart.clearSelection') {
+        state.selection = { kind: 'none' };
+      } else if (value.eventName === 'chart.setSelection') {
+        const payload = value.payload as unknown;
+        assertRecord(payload, 'payload must be an object');
+        const selection = (payload as any).selection as unknown;
+        assertRecord(selection, 'payload.selection must be an object');
+
+        const kind = String((selection as any).kind ?? '');
+
+        let nextSelection: Record<string, unknown>;
+        if (kind === 'none') {
+          nextSelection = { kind: 'none' };
+        } else if (kind === 'point') {
+          const rowIndex = (selection as any).rowIndex as unknown;
+          if (typeof rowIndex !== 'number' || !Number.isInteger(rowIndex) || rowIndex < 0) {
+            throw new Error('payload.selection.rowIndex must be a non-negative integer');
+          }
+
+          const data = (component.props as any).data as unknown;
+          assertRecord(data, 'Chart props.data must be an object');
+          const rows = (data as any).rows as unknown;
+          if (!Array.isArray(rows)) throw new Error('Chart props.data.rows must be an array');
+
+          if (rowIndex >= rows.length) {
+            throw new Error(`payload.selection.rowIndex out of range: rowIndex=${rowIndex} rows=${rows.length}`);
+          }
+
+          nextSelection = { kind: 'point', rowIndex };
+        } else if (kind === 'range') {
+          const column = (selection as any).column as unknown;
+          if (typeof column !== 'string' || !column.trim()) throw new Error('payload.selection.column must be a non-empty string');
+          const from = (selection as any).from as unknown;
+          const to = (selection as any).to as unknown;
+          if (!(from === null || typeof from === 'string' || isFiniteNumber(from))) {
+            throw new Error('payload.selection.from must be string|number|null');
+          }
+          if (!(to === null || typeof to === 'string' || isFiniteNumber(to))) {
+            throw new Error('payload.selection.to must be string|number|null');
+          }
+          nextSelection = { kind: 'range', column, from, to };
+        } else if (kind === 'series') {
+          const seriesValue = (selection as any).value as unknown;
+          if (!(typeof seriesValue === 'string' || isFiniteNumber(seriesValue))) {
+            throw new Error('payload.selection.value must be string|number');
+          }
+          nextSelection = { kind: 'series', value: seriesValue };
+        } else {
+          throw new Error('payload.selection.kind must be one of "none"|"point"|"range"|"series"');
+        }
+
+        state.selection = nextSelection;
+      } else {
+        throw new Error(`unsupported Chart eventName: ${value.eventName}`);
+      }
     } else if (componentType === 'FormCard') {
       const valuesState = { ...((state.values as any) ?? {}) } as Record<string, unknown>;
       if (value.eventName === 'setField') {

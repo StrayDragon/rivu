@@ -5,10 +5,20 @@ import { max } from 'd3-array';
 import { scaleBand, scaleLinear, scalePoint } from 'd3-scale';
 import { arc, line, pie, curveMonotoneX } from 'd3-shape';
 
-import { chartPropsV1Schema, type ChartPropsV1 } from 'rivu-ui-spec';
+import { selectUiComponentV1, type RivuKernel } from 'rivu-kernel';
+import {
+  UI_V1_EVENT_NAME,
+  chartPropsV1Schema,
+  chartSelectionStateV1Schema,
+  type ChartPropsV1,
+  type ChartSelectionStateV1,
+  type ChartSelectionV1,
+  type UiV1CustomEvent,
+} from 'rivu-ui-spec';
 
 import type { RivuComponentRegistration } from '../registry.js';
 import { ComponentErrorCard } from '../component-error-card.js';
+import { createClientRequestId } from '../client-request-id.js';
 
 const theme = {
   bg: 'var(--rivu-bg, #fff)',
@@ -159,10 +169,24 @@ function Tooltip(props: { state: TooltipState }) {
   );
 }
 
-function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSProperties }) {
+function ChartInner(
+  props: ChartPropsV1 & {
+    kernel?: RivuKernel;
+    componentId?: string;
+    revision?: number;
+    state?: ChartSelectionStateV1 | undefined;
+    interactive?: boolean;
+    className?: string;
+    style?: CSSProperties;
+  },
+) {
   const title = chartTitle(props.options);
   const height = chartHeight(props.options);
   const unit = props.options?.unit;
+
+  const interactive = props.interactive === true;
+  const selection: ChartSelectionV1 = props.state?.selection ?? { kind: 'none' };
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const { ref, width, node } = useResizeObserver();
   const w = width > 0 ? width : 520;
@@ -172,6 +196,77 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
   const innerH = Math.max(0, height - margin.top - margin.bottom);
 
   const [tooltip, setTooltip] = useState<TooltipState>({ visible: false });
+  const [brush, setBrush] = useState<{ startX: number; currentX: number } | null>(null);
+
+  const sendSelection = async (next: ChartSelectionV1) => {
+    if (!interactive) return;
+    if (!props.kernel) {
+      setLocalError('Chart interactive mode requires a kernel with send() support');
+      return;
+    }
+    if (typeof props.componentId !== 'string' || !props.componentId.trim()) {
+      setLocalError('Chart interactive mode requires componentId');
+      return;
+    }
+    if (typeof props.revision !== 'number' || !Number.isFinite(props.revision)) {
+      setLocalError('Chart interactive mode requires a finite revision number');
+      return;
+    }
+    setLocalError(null);
+
+    const action: UiV1CustomEvent = {
+      type: 'CUSTOM',
+      name: UI_V1_EVENT_NAME,
+      value: {
+        componentId: props.componentId,
+        eventName: 'chart.setSelection',
+        payload: { selection: next as any },
+        clientRequestId: createClientRequestId(),
+        baseRevision: props.revision,
+      },
+    };
+
+    try {
+      await props.kernel.send(action);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const clearSelection = async () => {
+    if (!interactive) return;
+    if (!props.kernel) {
+      setLocalError('Chart interactive mode requires a kernel with send() support');
+      return;
+    }
+    if (typeof props.componentId !== 'string' || !props.componentId.trim()) {
+      setLocalError('Chart interactive mode requires componentId');
+      return;
+    }
+    if (typeof props.revision !== 'number' || !Number.isFinite(props.revision)) {
+      setLocalError('Chart interactive mode requires a finite revision number');
+      return;
+    }
+    setLocalError(null);
+
+    const action: UiV1CustomEvent = {
+      type: 'CUSTOM',
+      name: UI_V1_EVENT_NAME,
+      value: {
+        componentId: props.componentId,
+        eventName: 'chart.clearSelection',
+        payload: {},
+        clientRequestId: createClientRequestId(),
+        baseRevision: props.revision,
+      },
+    };
+
+    try {
+      await props.kernel.send(action);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : String(err));
+    }
+  };
 
   const localPoint = (clientX: number, clientY: number) => {
     const rect = node?.getBoundingClientRect();
@@ -221,14 +316,15 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
         return null;
       }
 
-      type CartesianDatum = { x: string; y: number; series: string };
+      type CartesianDatum = { rowIndex: number; x: string; y: number; series: string };
 
       const raw = props.data.rows
-        .map((row) => {
+        .map((row, rowIndex) => {
           const x = row[xIdx];
           const y = row[yIdx];
           const s = typeof seriesIdx === 'number' ? row[seriesIdx] : null;
           return {
+            rowIndex,
             x: x === null ? null : String(x),
             y: typeof y === 'number' && Number.isFinite(y) ? y : null,
             series: s === null ? '' : String(s),
@@ -240,6 +336,20 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
 
       const xDomain = Array.from(new Set(raw.map((d) => d.x)));
       const seriesDomain = Array.from(new Set(raw.map((d) => d.series)));
+
+      const selectedSeries = selection.kind === 'series' ? String(selection.value) : null;
+      const selectedXDomain: Set<string> | null = (() => {
+        if (selection.kind !== 'range') return null;
+        if (selection.from === null || selection.to === null) return null;
+        const fromLabel = typeof selection.from === 'string' || typeof selection.from === 'number' ? String(selection.from) : null;
+        const toLabel = typeof selection.to === 'string' || typeof selection.to === 'number' ? String(selection.to) : null;
+        if (!fromLabel || !toLabel) return null;
+        const a = xDomain.indexOf(fromLabel);
+        const b = xDomain.indexOf(toLabel);
+        if (a < 0 || b < 0) return null;
+        const [fromIdx, toIdx] = a <= b ? [a, b] : [b, a];
+        return new Set(xDomain.slice(fromIdx, toIdx + 1));
+      })();
 
       const yMax = max(raw, (d) => d.y) ?? 0;
 
@@ -276,6 +386,65 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
               ) : null}
 
               <g transform={`translate(${margin.left},${margin.top})`}>
+                {interactive ? (
+                  <>
+                    <rect
+                      x={0}
+                      y={0}
+                      width={innerW}
+                      height={innerH}
+                      fill="transparent"
+                      onMouseDown={(e) => {
+                        if (e.button !== 0) return;
+                        const p = localPoint(e.clientX, e.clientY);
+                        const xSvg = p.x - 14;
+                        setBrush({ startX: xSvg - margin.left, currentX: xSvg - margin.left });
+                      }}
+                      onMouseMove={(e) => {
+                        if (!brush) return;
+                        const p = localPoint(e.clientX, e.clientY);
+                        const xSvg = p.x - 14;
+                        setBrush({ ...brush, currentX: xSvg - margin.left });
+                      }}
+                      onMouseUp={() => {
+                        if (!brush) return;
+                        const nearestX = (px: number) => {
+                          let best: string | null = null;
+                          let bestDist = Number.POSITIVE_INFINITY;
+                          for (const label of xDomain) {
+                            const v = x0(label);
+                            if (typeof v !== 'number') continue;
+                            const center = v + x0.bandwidth() / 2;
+                            const dist = Math.abs(center - px);
+                            if (dist < bestDist) {
+                              bestDist = dist;
+                              best = label;
+                            }
+                          }
+                          return best;
+                        };
+                        const from = nearestX(brush.startX);
+                        const to = nearestX(brush.currentX);
+                        setBrush(null);
+                        if (!from || !to) return;
+                        if (!props.encoding.x) return;
+                        void sendSelection({ kind: 'range', column: props.encoding.x, from, to });
+                      }}
+                      onMouseLeave={() => setBrush(null)}
+                    />
+                    {brush ? (
+                      <rect
+                        x={Math.min(brush.startX, brush.currentX)}
+                        y={0}
+                        width={Math.abs(brush.currentX - brush.startX)}
+                        height={innerH}
+                        fill="rgba(37,99,235,0.10)"
+                        stroke="rgba(37,99,235,0.35)"
+                        pointerEvents="none"
+                      />
+                    ) : null}
+                  </>
+                ) : null}
                 {yTicks.map((t, i) => (
                   <g key={i} transform={`translate(0,${yScale(t)})`}>
                     <line x1={0} x2={innerW} y1={0} y2={0} stroke={theme.borderMuted} />
@@ -310,6 +479,12 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
                   const seriesColorIndex = seriesDomain.indexOf(series);
                   const color = colorAt(seriesColorIndex < 0 ? 0 : seriesColorIndex);
 
+                  const isPointSelected = selection.kind === 'point' && selection.rowIndex === d.rowIndex;
+                  const isSeriesSelected = selectedSeries !== null && series === selectedSeries;
+                  const isRangeSelected = selectedXDomain !== null && selectedXDomain.has(d.x);
+                  const isActive =
+                    selection.kind === 'none' ? true : selection.kind === 'point' ? isPointSelected : selection.kind === 'series' ? isSeriesSelected : isRangeSelected;
+
                   return (
                     <rect
                       key={i}
@@ -319,7 +494,14 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
                       height={h}
                       rx={6}
                       fill={color}
+                      opacity={isActive ? 1 : selection.kind === 'none' ? 1 : 0.35}
+                      stroke={isPointSelected ? theme.fg : 'transparent'}
+                      strokeWidth={isPointSelected ? 2 : 0}
                       tabIndex={0}
+                      onClick={() => {
+                        if (!interactive) return;
+                        void sendSelection({ kind: 'point', rowIndex: d.rowIndex });
+                      }}
                       onFocus={(e) => {
                         const rect = (e.target as SVGRectElement).getBoundingClientRect();
                         const p = localPointFromTargetRect(rect);
@@ -390,6 +572,64 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
             ) : null}
 
             <g transform={`translate(${margin.left},${margin.top})`}>
+              {interactive ? (
+                <>
+                  <rect
+                    x={0}
+                    y={0}
+                    width={innerW}
+                    height={innerH}
+                    fill="transparent"
+                    onMouseDown={(e) => {
+                      if (e.button !== 0) return;
+                      const p = localPoint(e.clientX, e.clientY);
+                      const xSvg = p.x - 14;
+                      setBrush({ startX: xSvg - margin.left, currentX: xSvg - margin.left });
+                    }}
+                    onMouseMove={(e) => {
+                      if (!brush) return;
+                      const p = localPoint(e.clientX, e.clientY);
+                      const xSvg = p.x - 14;
+                      setBrush({ ...brush, currentX: xSvg - margin.left });
+                    }}
+                    onMouseUp={() => {
+                      if (!brush) return;
+                      const nearestX = (px: number) => {
+                        let best: string | null = null;
+                        let bestDist = Number.POSITIVE_INFINITY;
+                        for (const label of xDomain) {
+                          const v = x(label);
+                          if (typeof v !== 'number') continue;
+                          const dist = Math.abs(v - px);
+                          if (dist < bestDist) {
+                            bestDist = dist;
+                            best = label;
+                          }
+                        }
+                        return best;
+                      };
+                      const from = nearestX(brush.startX);
+                      const to = nearestX(brush.currentX);
+                      setBrush(null);
+                      if (!from || !to) return;
+                      if (!props.encoding.x) return;
+                      void sendSelection({ kind: 'range', column: props.encoding.x, from, to });
+                    }}
+                    onMouseLeave={() => setBrush(null)}
+                  />
+                  {brush ? (
+                    <rect
+                      x={Math.min(brush.startX, brush.currentX)}
+                      y={0}
+                      width={Math.abs(brush.currentX - brush.startX)}
+                      height={innerH}
+                      fill="rgba(37,99,235,0.10)"
+                      stroke="rgba(37,99,235,0.35)"
+                      pointerEvents="none"
+                    />
+                  ) : null}
+                </>
+              ) : null}
               {yTicks.map((t, i) => (
                 <g key={i} transform={`translate(0,${yScale(t)})`}>
                   <line x1={0} x2={innerW} y1={0} y2={0} stroke={theme.borderMuted} />
@@ -407,23 +647,41 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
 
               {grouped.map((g, i) => {
                 const color = colorAt(i);
-                const points = g.points
-                  .map((p) => ({ x: p.x, y: p.y }))
-                  .filter((p) => typeof p.x === 'string' && typeof p.y === 'number');
-                const path = makeLine(points) ?? '';
+                const points = g.points;
+                const pathPoints = points.map((p) => ({ x: p.x, y: p.y })).filter((p) => typeof p.x === 'string' && typeof p.y === 'number');
+                const path = makeLine(pathPoints) ?? '';
+                const seriesOpacity = selectedSeries !== null && g.series !== selectedSeries ? 0.35 : 1;
                 return (
                   <g key={g.series || '<default>'}>
-                    <path d={path} fill="none" stroke={color} strokeWidth={2.5} />
-                    {points.map((p, j) => (
+                    <path d={path} fill="none" stroke={color} strokeWidth={2.5} opacity={seriesOpacity} />
+                    {points.map((p, j) => {
+                      const isPointSelected = selection.kind === 'point' && selection.rowIndex === p.rowIndex;
+                      const isRangeSelected = selectedXDomain !== null && selectedXDomain.has(p.x);
+                      const isActive =
+                        selection.kind === 'none'
+                          ? true
+                          : selection.kind === 'point'
+                            ? isPointSelected
+                            : selection.kind === 'series'
+                              ? g.series === selectedSeries
+                              : isRangeSelected;
+                      return (
                       <circle
                         key={j}
                         cx={x(p.x) ?? 0}
                         cy={yScale(p.y)}
                         r={3}
                         fill={color}
-                        tabIndex={0}
-                        onFocus={(e) => {
-                          const rect = (e.target as SVGCircleElement).getBoundingClientRect();
+                        opacity={seriesOpacity * (isActive ? 1 : selection.kind === 'none' ? 1 : 0.35)}
+                        stroke={isPointSelected ? theme.fg : 'transparent'}
+                        strokeWidth={isPointSelected ? 2 : 0}
+                      tabIndex={0}
+                      onClick={() => {
+                        if (!interactive) return;
+                        void sendSelection({ kind: 'point', rowIndex: p.rowIndex });
+                      }}
+                      onFocus={(e) => {
+                        const rect = (e.target as SVGCircleElement).getBoundingClientRect();
                           const p0 = localPointFromTargetRect(rect);
                           setTooltip({
                             visible: true,
@@ -451,7 +709,8 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
                           });
                         }}
                       />
-                    ))}
+                      );
+                    })}
                   </g>
                 );
               })}
@@ -467,10 +726,17 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
     const valueIdx = encode(props.encoding.value);
     if (typeof labelIdx !== 'number' || typeof valueIdx !== 'number') return null;
 
-    const values = props.data.rows
-      .map((row) => ({ label: row[labelIdx], value: row[valueIdx], series: typeof seriesIdx === 'number' ? row[seriesIdx] : null }))
-      .filter((d) => typeof d.label === 'string' && d.label.trim() !== '' && typeof d.value === 'number' && Number.isFinite(d.value) && d.value >= 0)
-      .map((d) => ({ label: d.label as string, value: d.value as number, series: d.series === null ? null : String(d.series) }));
+    type PieDatum = { rowIndex: number; label: string; value: number; series: string | null };
+
+    const values: PieDatum[] = [];
+    for (const [rowIndex, row] of props.data.rows.entries()) {
+      const label = row[labelIdx];
+      const value = row[valueIdx];
+      if (typeof label !== 'string' || label.trim() === '') continue;
+      if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) continue;
+      const seriesCell = typeof seriesIdx === 'number' ? row[seriesIdx] : null;
+      values.push({ rowIndex, label, value, series: seriesCell === null ? null : String(seriesCell) });
+    }
 
     if (values.length === 0) return null;
 
@@ -478,7 +744,7 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
     const cx = margin.left + innerW / 2;
     const cy = margin.top + innerH / 2;
 
-    const p = pie<{ label: string; value: number }>().value((d) => d.value);
+    const p = pie<PieDatum>().value((d) => d.value);
     const arcs = p(values);
     const makeArc = arc<any>().innerRadius(0).outerRadius(r);
 
@@ -503,14 +769,23 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
             {arcs.map((a, i) => {
               const color = colorAt(i);
               const path = makeArc(a) ?? '';
+              const rowIndex = values[i]!.rowIndex;
+              const isPointSelected = selection.kind === 'point' && selection.rowIndex === rowIndex;
+              const isSeriesSelected = selection.kind === 'series' && values[i]!.series !== null && values[i]!.series === String(selection.value);
+              const isActive = selection.kind === 'none' ? true : selection.kind === 'point' ? isPointSelected : isSeriesSelected;
               return (
                 <path
                   key={i}
                   d={path}
                   fill={color}
+                  opacity={isActive ? 1 : selection.kind === 'none' ? 1 : 0.35}
                   stroke={theme.bg}
-                  strokeWidth={1}
+                  strokeWidth={isPointSelected ? 3 : 1}
                   tabIndex={0}
+                  onClick={() => {
+                    if (!interactive) return;
+                    void sendSelection({ kind: 'point', rowIndex });
+                  }}
                   onFocus={(e) => {
                     const rect = (e.target as SVGPathElement).getBoundingClientRect();
                     const p0 = localPointFromTargetRect(rect);
@@ -547,10 +822,61 @@ function ChartInner(props: ChartPropsV1 & { className?: string; style?: CSSPrope
     return <ChartEmptyState title={title} className={props.className} style={props.style} />;
   }
 
+  const selectionLabel = (() => {
+    if (selection.kind === 'none') return null;
+    if (selection.kind === 'point') return `Selected rowIndex=${selection.rowIndex}`;
+    if (selection.kind === 'series') return `Selected series=${String(selection.value)}`;
+    if (selection.kind === 'range') return `Selected range ${selection.column}: ${String(selection.from)}..${String(selection.to)}`;
+    return null;
+  })();
+
   return (
     <div ref={ref} className={props.className} style={containerStyle}>
       {svg}
       <Tooltip state={tooltip} />
+      {selectionLabel ? (
+        <div
+          style={{
+            position: 'absolute',
+            right: 10,
+            top: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '6px 10px',
+            borderRadius: 999,
+            border: `1px solid ${theme.borderMuted}`,
+            background: theme.bg,
+            color: theme.fgMuted,
+            fontSize: 12,
+            maxWidth: '80%',
+            userSelect: 'none',
+          }}
+        >
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectionLabel}</span>
+          {interactive ? (
+            <button
+              type="button"
+              onClick={() => void clearSelection()}
+              style={{
+                border: `1px solid ${theme.borderMuted}`,
+                background: theme.bgMuted,
+                borderRadius: 999,
+                fontSize: 11,
+                padding: '3px 8px',
+                cursor: 'pointer',
+              }}
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {localError ? (
+        <div style={{ position: 'absolute', left: 10, bottom: 10, color: 'var(--rivu-chart-4, #991b1b)', fontSize: 12 }}>
+          {localError}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -575,7 +901,17 @@ class ChartErrorBoundary extends Component<{ children: ReactNode }, { error: Err
   }
 }
 
-export function Chart(props: ChartPropsV1 & { className?: string; style?: CSSProperties }) {
+export function Chart(
+  props: ChartPropsV1 & {
+    kernel?: RivuKernel;
+    componentId?: string;
+    revision?: number;
+    state?: ChartSelectionStateV1 | undefined;
+    interactive?: boolean;
+    className?: string;
+    style?: CSSProperties;
+  },
+) {
   return (
     <ChartErrorBoundary>
       <ChartInner {...props} />
@@ -583,8 +919,13 @@ export function Chart(props: ChartPropsV1 & { className?: string; style?: CSSPro
   );
 }
 
-export const chartRegistrationV1: RivuComponentRegistration<ChartPropsV1> = {
+export const chartRegistrationV1: RivuComponentRegistration<ChartPropsV1, ChartSelectionStateV1> = {
   schemaVersion: CHART_SCHEMA_VERSION,
   propsSchema: chartPropsV1Schema,
-  render: ({ props }) => <Chart {...props} />,
+  stateSchema: chartSelectionStateV1Schema,
+  render: ({ kernel, componentId, revision, props, state }) => {
+    const raw = selectUiComponentV1(kernel.getState(), componentId);
+    const interactive = raw?.state != null;
+    return <Chart {...props} kernel={kernel} componentId={componentId} revision={revision} state={state} interactive={interactive} />;
+  },
 };

@@ -106,6 +106,61 @@ test('Viewer component degrades to UnknownComponentCard on invalid Chart props',
   expect(screen.getByText('Invalid component props')).toBeTruthy();
 });
 
+test('Chart emits ui.v1.event chart.setSelection with baseRevision', async () => {
+  const actions: any[] = [];
+  const kernel = createKernel({
+    actionTransport: vi.fn(async (action) => {
+      actions.push(action);
+    }),
+  });
+
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_chart: {
+              type: 'Chart',
+              schemaVersion: 1,
+              props: {
+                mark: 'bar',
+                data: { columns: ['x', 'y'], rows: [['A', 10]] },
+                encoding: { x: 'x', y: 'y' },
+              },
+              state: { selection: { kind: 'none' } },
+              revision: 7,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} registry={createRegistry(viewerRegistryV1)} componentId="cmp_chart" />);
+
+  const bar = document.querySelector('svg rect[tabindex="0"]') as SVGRectElement | null;
+  expect(bar).toBeTruthy();
+
+  await act(async () => {
+    fireEvent.click(bar!);
+  });
+
+  expect(actions.length).toBe(1);
+  expect(actions[0].type).toBe('CUSTOM');
+  expect(actions[0].name).toBe('ui.v1.event');
+  expect(actions[0].value.componentId).toBe('cmp_chart');
+  expect(actions[0].value.eventName).toBe('chart.setSelection');
+  expect(actions[0].value.baseRevision).toBe(7);
+  expect(actions[0].value.payload.selection.kind).toBe('point');
+  expect(actions[0].value.payload.selection.rowIndex).toBe(0);
+  expect(typeof actions[0].value.clientRequestId).toBe('string');
+  expect(actions[0].value.clientRequestId.length).toBeGreaterThan(0);
+});
+
 test('ApprovalCard emits ui.v1.event approve with baseRevision', async () => {
   const actions: any[] = [];
   const kernel = createKernel({

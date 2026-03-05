@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Literal, TypedDict
@@ -125,11 +126,71 @@ class UiV1EventProcessor:
         state = dict(component.state or {})
         revision = int(component.revision)
 
+        def is_finite_number(v: Any) -> bool:
+            if isinstance(v, bool):
+                return False
+            if not isinstance(v, (int, float)):
+                return False
+            return math.isfinite(float(v))
+
         if component.type == "ApprovalCard":
             if event_name not in ("approve", "deny"):
                 raise InvalidPayloadError(f"unsupported ApprovalCard eventName: {event_name}")
             state["status"] = "approved" if event_name == "approve" else "denied"
             state.setdefault("decidedAtMs", self.now_ms())
+            return component.model_copy(update={"state": state, "revision": revision + 1})
+
+        if component.type == "Chart":
+            if event_name == "chart.clearSelection":
+                state["selection"] = {"kind": "none"}
+                return component.model_copy(update={"state": state, "revision": revision + 1})
+
+            if event_name != "chart.setSelection":
+                raise InvalidPayloadError(f"unsupported Chart eventName: {event_name}")
+
+            selection = payload.get("selection")
+            if not isinstance(selection, dict):
+                raise InvalidPayloadError("payload.selection must be an object")
+            kind = selection.get("kind")
+
+            if kind == "none":
+                next_selection = {"kind": "none"}
+            elif kind == "point":
+                row_index = selection.get("rowIndex")
+                if not isinstance(row_index, int) or row_index < 0:
+                    raise InvalidPayloadError("payload.selection.rowIndex must be a non-negative integer")
+
+                data = component.props.get("data")
+                rows: Any = None
+                if isinstance(data, dict):
+                    rows = data.get("rows")
+                if not isinstance(rows, list):
+                    raise InvalidPayloadError("Chart props.data.rows must be an array")
+                if row_index >= len(rows):
+                    raise InvalidPayloadError(
+                        f"payload.selection.rowIndex out of range: rowIndex={row_index} rows={len(rows)}"
+                    )
+                next_selection = {"kind": "point", "rowIndex": row_index}
+            elif kind == "range":
+                column = selection.get("column")
+                if not isinstance(column, str) or not column.strip():
+                    raise InvalidPayloadError("payload.selection.column must be a non-empty string")
+                from_v = selection.get("from")
+                to_v = selection.get("to")
+                if from_v is not None and not (is_finite_number(from_v) or isinstance(from_v, str)):
+                    raise InvalidPayloadError("payload.selection.from must be string|number|null")
+                if to_v is not None and not (is_finite_number(to_v) or isinstance(to_v, str)):
+                    raise InvalidPayloadError("payload.selection.to must be string|number|null")
+                next_selection = {"kind": "range", "column": column, "from": from_v, "to": to_v}
+            elif kind == "series":
+                series_value = selection.get("value")
+                if not (isinstance(series_value, str) or is_finite_number(series_value)):
+                    raise InvalidPayloadError("payload.selection.value must be string|number")
+                next_selection = {"kind": "series", "value": series_value}
+            else:
+                raise InvalidPayloadError('payload.selection.kind must be one of "none"|"point"|"range"|"series"')
+
+            state["selection"] = next_selection
             return component.model_copy(update={"state": state, "revision": revision + 1})
 
         if component.type == "FormCard":
@@ -157,4 +218,3 @@ class UiV1EventProcessor:
 
 def _encode_pointer(token: str) -> str:
     return token.replace("~", "~0").replace("/", "~1")
-

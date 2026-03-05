@@ -6,6 +6,7 @@ import pytest
 
 from rivu_server_sdk import (
     InMemoryRingBufferEventStore,
+    InvalidPayloadError,
     SeqAllocator,
     SqliteSnapshotStore,
     UiV1CustomEvent,
@@ -125,3 +126,99 @@ def test_ui_v1_event_processor_idempotency_and_revision_conflict() -> None:
     assert reduced["status"] == "ok"
     assert reduced["sharedState"]["ui"]["components"]["cmp_1"]["revision"] == 1
 
+
+def test_ui_v1_event_processor_chart_selection_roundtrip() -> None:
+    shared_state: dict[str, object] = {
+        "ui": {
+            "v": 1,
+            "components": {
+                "cmp_chart": {
+                    "type": "Chart",
+                    "schemaVersion": 1,
+                    "props": {
+                        "mark": "bar",
+                        "data": {"columns": ["x", "y"], "rows": [[1, 10], [2, 20]]},
+                        "encoding": {"x": "x", "y": "y"},
+                    },
+                    "state": {"selection": {"kind": "none"}},
+                    "revision": 0,
+                    "mounts": [],
+                }
+            },
+        }
+    }
+
+    processor = UiV1EventProcessor()
+
+    select = UiV1CustomEvent.model_validate(
+        {
+            "type": "CUSTOM",
+            "name": "ui.v1.event",
+            "value": {
+                "componentId": "cmp_chart",
+                "eventName": "chart.setSelection",
+                "payload": {"selection": {"kind": "point", "rowIndex": 1}},
+                "clientRequestId": "req_1",
+                "baseRevision": 0,
+            },
+        }
+    )
+
+    first = processor.process(shared_state=shared_state, event=select)
+    assert first["new_revision"] == 1
+    assert first["shared_state"]["ui"]["components"]["cmp_chart"]["revision"] == 1
+    assert first["shared_state"]["ui"]["components"]["cmp_chart"]["state"]["selection"]["kind"] == "point"
+    assert first["shared_state"]["ui"]["components"]["cmp_chart"]["state"]["selection"]["rowIndex"] == 1
+
+    second = processor.process(shared_state=first["shared_state"], event=select)
+    assert second["new_revision"] == 1
+    assert second["shared_state"]["ui"]["components"]["cmp_chart"]["revision"] == 1
+
+    conflict = UiV1CustomEvent.model_validate(
+        {
+            "type": "CUSTOM",
+            "name": "ui.v1.event",
+            "value": {
+                "componentId": "cmp_chart",
+                "eventName": "chart.clearSelection",
+                "payload": {},
+                "clientRequestId": "req_2",
+                "baseRevision": 0,
+            },
+        }
+    )
+    with pytest.raises(RevisionConflictError):
+        processor.process(shared_state=first["shared_state"], event=conflict)
+
+    invalid = UiV1CustomEvent.model_validate(
+        {
+            "type": "CUSTOM",
+            "name": "ui.v1.event",
+            "value": {
+                "componentId": "cmp_chart",
+                "eventName": "chart.setSelection",
+                "payload": {"selection": {"kind": "point", "rowIndex": 2}},
+                "clientRequestId": "req_3",
+                "baseRevision": 1,
+            },
+        }
+    )
+    with pytest.raises(InvalidPayloadError):
+        processor.process(shared_state=first["shared_state"], event=invalid)
+
+    clear = UiV1CustomEvent.model_validate(
+        {
+            "type": "CUSTOM",
+            "name": "ui.v1.event",
+            "value": {
+                "componentId": "cmp_chart",
+                "eventName": "chart.clearSelection",
+                "payload": {},
+                "clientRequestId": "req_4",
+                "baseRevision": 1,
+            },
+        }
+    )
+    cleared = processor.process(shared_state=first["shared_state"], event=clear)
+    assert cleared["new_revision"] == 2
+    assert cleared["shared_state"]["ui"]["components"]["cmp_chart"]["state"]["selection"]["kind"] == "none"

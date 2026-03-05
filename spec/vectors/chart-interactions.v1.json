@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "chartInteractionsV1": {
+    "valid": [
+      {
+        "id": "setSelection_point_ok",
+        "eventName": "chart.setSelection",
+        "payload": { "selection": { "kind": "point", "rowIndex": 1 } },
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      },
+      {
+        "id": "setSelection_range_ok",
+        "eventName": "chart.setSelection",
+        "payload": { "selection": { "kind": "range", "column": "x", "from": 1, "to": 2 } },
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      },
+      {
+        "id": "setSelection_series_ok",
+        "eventName": "chart.setSelection",
+        "payload": { "selection": { "kind": "series", "value": "A" } },
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      },
+      {
+        "id": "setSelection_none_ok",
+        "eventName": "chart.setSelection",
+        "payload": { "selection": { "kind": "none" } },
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      },
+      {
+        "id": "clearSelection_ok",
+        "eventName": "chart.clearSelection",
+        "payload": {},
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      }
+    ],
+    "invalid": [
+      {
+        "id": "setSelection_missing_selection",
+        "eventName": "chart.setSelection",
+        "payload": {},
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      },
+      {
+        "id": "setSelection_kind_invalid",
+        "eventName": "chart.setSelection",
+        "payload": { "selection": { "kind": "bad", "rowIndex": 0 } },
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      },
+      {
+        "id": "setSelection_point_rowIndex_negative",
+        "eventName": "chart.setSelection",
+        "payload": { "selection": { "kind": "point", "rowIndex": -1 } },
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      },
+      {
+        "id": "setSelection_point_rowIndex_out_of_range",
+        "eventName": "chart.setSelection",
+        "payload": { "selection": { "kind": "point", "rowIndex": 2 } },
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      },
+      {
+        "id": "setSelection_range_missing_column",
+        "eventName": "chart.setSelection",
+        "payload": { "selection": { "kind": "range", "from": 0, "to": 1 } },
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      },
+      {
+        "id": "setSelection_range_missing_to",
+        "eventName": "chart.setSelection",
+        "payload": { "selection": { "kind": "range", "column": "x", "from": 0 } },
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      },
+      {
+        "id": "setSelection_series_missing_value",
+        "eventName": "chart.setSelection",
+        "payload": { "selection": { "kind": "series" } },
+        "dataset": { "columns": ["x", "y", "series"], "rows": [[1, 10, "A"], [2, 20, "B"]] }
+      }
+    ]
+  }
+}
+
