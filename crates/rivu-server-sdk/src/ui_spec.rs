@@ -143,6 +143,38 @@ impl UiMountV1 {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum UiComponentStatusV1 {
+    Building,
+    Ready,
+    Error,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UiComponentErrorV1 {
+    pub code: String,
+    pub message: String,
+    #[serde(default)]
+    pub details: Option<Map<String, Value>>,
+
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+impl UiComponentErrorV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if self.code.trim().is_empty() {
+            return Err(UiSpecError::ValidationError("component.error.code must be non-empty".into()));
+        }
+        if self.message.trim().is_empty() {
+            return Err(UiSpecError::ValidationError("component.error.message must be non-empty".into()));
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UiComponentV1 {
@@ -157,12 +189,27 @@ pub struct UiComponentV1 {
     pub revision: u64,
     pub mounts: Vec<UiMountV1>,
 
+    #[serde(default)]
+    pub status: Option<UiComponentStatusV1>,
+    #[serde(default)]
+    pub error: Option<UiComponentErrorV1>,
+
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
 }
 
 impl UiComponentV1 {
     pub fn validate(&self) -> Result<(), UiSpecError> {
+        let status = self.status.as_ref().unwrap_or(&UiComponentStatusV1::Ready);
+        if *status == UiComponentStatusV1::Error {
+            let Some(err) = &self.error else {
+                return Err(UiSpecError::ValidationError("component.error must be set when status=error".into()));
+            };
+            err.validate()?;
+        } else if self.error.is_some() {
+            return Err(UiSpecError::ValidationError("component.error must be omitted unless status=error".into()));
+        }
+
         if self.component_type.trim().is_empty() {
             return Err(UiSpecError::ValidationError("component.type must be non-empty".into()));
         }

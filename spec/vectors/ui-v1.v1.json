@@ -165,6 +165,37 @@
             "extraField": 123
           }
         }
+      },
+      {
+        "v": 1,
+        "components": {
+          "cmp_building": {
+            "type": "MetricCard",
+            "schemaVersion": 1,
+            "props": {},
+            "revision": 0,
+            "mounts": [],
+            "status": "building"
+          }
+        }
+      },
+      {
+        "v": 1,
+        "components": {
+          "cmp_error": {
+            "type": "MetricCard",
+            "schemaVersion": 1,
+            "props": {},
+            "revision": 0,
+            "mounts": [],
+            "status": "error",
+            "error": {
+              "code": "GENERATION_FAILED",
+              "message": "Failed to generate component",
+              "details": { "componentId": "cmp_error" }
+            }
+          }
+        }
       }
     ],
     "invalid": [
@@ -240,6 +271,64 @@
                 "order": 0
               }
             ]
+          }
+        }
+      },
+      {
+        "v": 1,
+        "components": {
+          "cmp_bad": {
+            "type": "MetricCard",
+            "schemaVersion": 1,
+            "props": {},
+            "revision": 0,
+            "mounts": [],
+            "status": "loading"
+          }
+        }
+      },
+      {
+        "v": 1,
+        "components": {
+          "cmp_bad": {
+            "type": "MetricCard",
+            "schemaVersion": 1,
+            "props": {},
+            "revision": 0,
+            "mounts": [],
+            "status": "error"
+          }
+        }
+      },
+      {
+        "v": 1,
+        "components": {
+          "cmp_bad": {
+            "type": "MetricCard",
+            "schemaVersion": 1,
+            "props": {},
+            "revision": 0,
+            "mounts": [],
+            "error": {
+              "code": "BOOM",
+              "message": "something went wrong"
+            }
+          }
+        }
+      },
+      {
+        "v": 1,
+        "components": {
+          "cmp_bad": {
+            "type": "MetricCard",
+            "schemaVersion": 1,
+            "props": {},
+            "revision": 0,
+            "mounts": [],
+            "status": "error",
+            "error": {
+              "message": "missing code"
+            }
           }
         }
       }

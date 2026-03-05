@@ -12,6 +12,19 @@ export type ResolveUiComponentResult =
       props: unknown;
       state: unknown;
     }
+  | {
+      status: 'building';
+      componentId: string;
+      componentType: string;
+      schemaVersion: number;
+    }
+  | {
+      status: 'error';
+      componentId: string;
+      componentType: string;
+      schemaVersion: number;
+      error: any;
+    }
   | { status: 'not_found' | 'unknown_type' | 'schema_mismatch' | 'invalid_props' | 'invalid_state'; details: any };
 
 export function resolveUiComponentV1(params: {
@@ -39,6 +52,25 @@ export function resolveUiComponentV1(params: {
         expectedSchemaVersion: registration.schemaVersion,
         gotSchemaVersion: component.schemaVersion,
       },
+    };
+  }
+
+  const lifecycleStatus = component.status ?? 'ready';
+  if (lifecycleStatus === 'error') {
+    return {
+      status: 'error',
+      componentId: params.componentId,
+      componentType: component.type,
+      schemaVersion: component.schemaVersion,
+      error: (component as any).error ?? null,
+    };
+  }
+  if (lifecycleStatus === 'building') {
+    return {
+      status: 'building',
+      componentId: params.componentId,
+      componentType: component.type,
+      schemaVersion: component.schemaVersion,
     };
   }
 

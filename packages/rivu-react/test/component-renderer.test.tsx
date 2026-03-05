@@ -121,6 +121,117 @@ test('ComponentRenderer degrades on invalid props', () => {
   expect(screen.getByText('Invalid component props')).toBeTruthy();
 });
 
+test('ComponentRenderer degrades on invalid state', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_bad_state: {
+              type: 'MetricCard',
+              schemaVersion: 1,
+              props: { label: 'Revenue', value: 1 },
+              state: { status: 123 },
+              revision: 0,
+              mounts: [{ messageId: 'msg_1', slot: 'inline', order: 0 }],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const registry = createRegistry({
+    MetricCard: {
+      schemaVersion: 1,
+      propsSchema: z.object({ label: z.string(), value: z.number() }).strict(),
+      stateSchema: z.object({ status: z.string() }).strict(),
+      render: () => <div data-testid="metric" />,
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_bad_state" />);
+  expect(screen.getByText('Invalid component state')).toBeTruthy();
+});
+
+test('ComponentRenderer renders skeleton for status=building (without strict props validation)', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_building: {
+              type: 'MetricCard',
+              schemaVersion: 1,
+              props: {},
+              revision: 0,
+              mounts: [],
+              status: 'building',
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const registry = createRegistry({
+    MetricCard: {
+      schemaVersion: 1,
+      propsSchema: z.object({ label: z.string(), value: z.number() }).strict(),
+      render: () => <div data-testid="metric" />,
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_building" />);
+  expect(screen.getByTestId('rivu-component-skeleton')).toBeTruthy();
+});
+
+test('ComponentRenderer renders error card for status=error (without strict props validation)', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_error: {
+              type: 'MetricCard',
+              schemaVersion: 1,
+              props: {},
+              revision: 0,
+              mounts: [],
+              status: 'error',
+              error: { code: 'BOOM', message: 'failed' },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const registry = createRegistry({
+    MetricCard: {
+      schemaVersion: 1,
+      propsSchema: z.object({ label: z.string(), value: z.number() }).strict(),
+      render: () => <div data-testid="metric" />,
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} registry={registry} componentId="cmp_error" />);
+  expect(screen.getByTestId('rivu-component-error-card')).toBeTruthy();
+  expect(screen.getByText('BOOM: failed')).toBeTruthy();
+});
+
 test('useKernelState subscribes and re-renders', () => {
   const kernel = createKernel();
 
@@ -138,4 +249,3 @@ test('useKernelState subscribes and re-renders', () => {
 
   expect(screen.getByTestId('seq').textContent).toBe('1');
 });
-

@@ -61,3 +61,91 @@ test('resolveUiComponentV1 degrades gracefully for unknown type / invalid props'
   expect(invalidProps.status).toBe('invalid_props');
 });
 
+test('resolveUiComponentV1 degrades on invalid state', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_bad_state: {
+              type: 'Demo',
+              schemaVersion: 1,
+              props: { foo: 'ok' },
+              state: { bar: 123 },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const registry = createRegistry({
+    Demo: {
+      schemaVersion: 1,
+      propsSchema: z.object({ foo: z.string() }),
+      stateSchema: z.object({ bar: z.string() }),
+      Component: DummyComponent,
+    },
+  });
+
+  const result = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_bad_state' });
+  expect(result.status).toBe('invalid_state');
+});
+
+test('resolveUiComponentV1 respects lifecycle status (unknown > error > building > ready)', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_building: {
+              type: 'Demo',
+              schemaVersion: 1,
+              props: {},
+              revision: 0,
+              mounts: [],
+              status: 'building',
+            },
+            cmp_error: {
+              type: 'Demo',
+              schemaVersion: 1,
+              props: {},
+              revision: 0,
+              mounts: [],
+              status: 'error',
+              error: { code: 'BOOM', message: 'failed' },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const registry = createRegistry({
+    Demo: {
+      schemaVersion: 1,
+      propsSchema: z.object({ foo: z.string() }),
+      Component: DummyComponent,
+    },
+  });
+
+  const building = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_building' });
+  expect(building.status).toBe('building');
+
+  const error = resolveUiComponentV1({ state: kernel.getState(), registry, componentId: 'cmp_error' });
+  expect(error.status).toBe('error');
+
+  const unknownRegistry = createRegistry({});
+  const unknownWins = resolveUiComponentV1({ state: kernel.getState(), registry: unknownRegistry, componentId: 'cmp_error' });
+  expect(unknownWins.status).toBe('unknown_type');
+});

@@ -3,6 +3,8 @@ import { selectUiComponentV1 } from 'rivu-kernel';
 
 import { useKernelState } from './use-kernel-state.js';
 import type { RivuComponentRegistry } from './registry.js';
+import { ComponentErrorCard } from './component-error-card.js';
+import { ComponentSkeleton } from './component-skeleton.js';
 import { UnknownComponentCard } from './unknown-component-card.js';
 import { useRivuContext } from './provider.js';
 
@@ -58,6 +60,21 @@ export function ComponentRenderer(props: ComponentRendererProps) {
         }}
       />
     );
+  }
+
+  const lifecycleStatus = component.status ?? 'ready';
+  if (lifecycleStatus === 'error') {
+    return (
+      <ComponentErrorCard
+        componentId={props.componentId}
+        componentType={component.type}
+        error={component.error ?? null}
+      />
+    );
+  }
+
+  if (lifecycleStatus === 'building') {
+    return <ComponentSkeleton />;
   }
 
   const propsResult = registration.propsSchema.safeParse(component.props);

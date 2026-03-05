@@ -9,6 +9,12 @@ export { useKernelState } from './use-kernel-state.js';
 export type { ComponentRendererProps } from './component-renderer.js';
 export { ComponentRenderer } from './component-renderer.js';
 
+export type { ComponentSkeletonProps } from './component-skeleton.js';
+export { ComponentSkeleton } from './component-skeleton.js';
+
+export type { ComponentErrorCardProps, ComponentErrorV1 } from './component-error-card.js';
+export { ComponentErrorCard } from './component-error-card.js';
+
 export type { ProtocolInspectorProps } from './protocol-inspector.js';
 export { ProtocolInspector } from './protocol-inspector.js';
 

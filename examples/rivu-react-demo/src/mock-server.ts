@@ -40,6 +40,7 @@ export function createMockServer(params: {
   let seq = 0;
   let sharedState: Record<string, unknown> = structuredClone(params.initialSharedState);
   const idempotency = new Map<string, ProcessResult>();
+  let lifecycleTimeouts: number[] = [];
 
   const emit = (event: unknown) => {
     seq += 1;
@@ -53,11 +54,57 @@ export function createMockServer(params: {
     seq = 0;
     sharedState = structuredClone(params.initialSharedState);
     idempotency.clear();
+    for (const t of lifecycleTimeouts) clearTimeout(t);
+    lifecycleTimeouts = [];
 
     for (const env of params.bootstrapEnvelopes) {
       emit(env.event);
       seq = env.seq;
     }
+
+    // Demo: lifecycle streaming example (building -> ready via multi-step patches).
+    const uiRaw = (sharedState as any).ui as unknown;
+    if (!uiRaw || typeof uiRaw !== 'object' || Array.isArray(uiRaw)) return;
+    const componentsRaw = (uiRaw as any).components as unknown;
+    if (!componentsRaw || typeof componentsRaw !== 'object' || Array.isArray(componentsRaw)) return;
+
+    const lifecycleId = 'cmp_lifecycle_metric';
+    const lifecycleComponent = (componentsRaw as any)[lifecycleId] as any;
+    if (!lifecycleComponent) return;
+
+    const ptr = encodePointer(lifecycleId);
+    const emitDelta = (delta: JsonPatchOp[]) => emit({ type: 'STATE_DELTA', delta });
+
+    // 1) Patch in partial props while still building.
+    lifecycleTimeouts.push(
+      window.setTimeout(() => {
+        lifecycleComponent.props = { ...(lifecycleComponent.props ?? {}), label: 'Streaming MetricCard', note: 'building → ready (demo)' };
+        emitDelta([
+          { op: 'add', path: `/ui/components/${ptr}/props/label`, value: 'Streaming MetricCard' },
+          { op: 'add', path: `/ui/components/${ptr}/props/note`, value: 'building → ready (demo)' },
+        ]);
+      }, 350),
+    );
+
+    // 2) Patch more props.
+    lifecycleTimeouts.push(
+      window.setTimeout(() => {
+        lifecycleComponent.props = { ...(lifecycleComponent.props ?? {}), value: 42_000, unit: 'USD', changePercent: 1.23 };
+        emitDelta([
+          { op: 'add', path: `/ui/components/${ptr}/props/value`, value: 42_000 },
+          { op: 'add', path: `/ui/components/${ptr}/props/unit`, value: 'USD' },
+          { op: 'add', path: `/ui/components/${ptr}/props/changePercent`, value: 1.23 },
+        ]);
+      }, 700),
+    );
+
+    // 3) Flip to ready (strict validation + real render).
+    lifecycleTimeouts.push(
+      window.setTimeout(() => {
+        lifecycleComponent.status = 'ready';
+        emitDelta([{ op: 'replace', path: `/ui/components/${ptr}/status`, value: 'ready' }]);
+      }, 1050),
+    );
   };
 
   const processUiV1Event = (action: UiV1CustomEvent): ProcessResult => {
@@ -145,4 +192,3 @@ export function createMockServer(params: {
     getSharedState: () => sharedState,
   };
 }
-

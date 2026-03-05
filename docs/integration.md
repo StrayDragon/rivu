@@ -61,7 +61,7 @@ kernel.subscribe(() => { /* rerender */ });
 
 `sharedState.ui` contains:
 
-- `components[componentId] = { type, schemaVersion, props, state?, revision, mounts[] }`
+- `components[componentId] = { type, schemaVersion, props, state?, revision, mounts[], status?, error? }`
 - `mounts[] = { messageId, slot, order }` for placement
 
 Kernel selectors:
@@ -113,16 +113,39 @@ Use `kernelStore(kernel)` to get `Readable<RivuKernelState>`, then either:
 - `resolveUiComponentV1({ state: $kernel, registry, componentId })`
 - or `componentRendererStore({ kernel, registry, componentId })` for a derived readable result
 
+## Component lifecycle (building / ready / error)
+
+`sharedState.ui.components[componentId]` MAY include:
+
+- `status?: "building" | "ready" | "error"` (missing defaults to `"ready"`)
+- `error?: { code: string, message: string, details?: object }` (only meaningful when `status="error"`)
+
+Guidance:
+- `building`: use when you want to mount a component early and stream patches later; the renderer shows a skeleton and does not require props/state to be complete yet.
+- `ready`: the normal state; the renderer strictly validates props/state against the registered schemas. Invalid data falls back to `UnknownComponentCard`.
+- `error`: use when component generation/validation/patching fails; the renderer shows a viewer-safe ErrorCard.
+
+Security note for `error`:
+- Keep `error.code/message` concise and **viewer-safe**.
+- Avoid secrets/PII in `error.details`; in production it should usually be omitted.
+
 ## UnknownComponent strategy
 
 Unknown/invalid components must **never crash the page**.
+
+Resolution priority is (highest → lowest):
+
+1) unknown: component not found / type not registered / schemaVersion mismatch / (when `status="ready"`) props/state validation fails → `UnknownComponentCard`
+2) error: `status="error"` → `ComponentErrorCard`
+3) building: `status="building"` → `ComponentSkeleton`
+4) ready: `status` missing or `"ready"` → normal render
 
 `ComponentRenderer` falls back to `UnknownComponentCard` when:
 
 - component not found
 - component type not registered
 - schemaVersion mismatch
-- props/state validation fails
+- props/state validation fails (only in `ready`)
 
 In production, treat UnknownComponent as a **viewer-safe** fallback (show type/version and raw JSON summary).
 

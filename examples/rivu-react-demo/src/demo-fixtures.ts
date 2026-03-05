@@ -34,6 +34,14 @@ export function createInitialSharedState() {
           revision: 0,
           mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 1 }],
         },
+        cmp_lifecycle_metric: {
+          type: 'MetricCard',
+          schemaVersion: 1,
+          props: {},
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 2 }],
+          status: 'building',
+        },
         cmp_table: {
           type: 'DataTable',
           schemaVersion: 1,
@@ -51,7 +59,7 @@ export function createInitialSharedState() {
             ],
           },
           revision: 0,
-          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 2 }],
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 3 }],
         },
         cmp_table_empty: {
           type: 'DataTable',
@@ -66,7 +74,7 @@ export function createInitialSharedState() {
             rows: [],
           },
           revision: 0,
-          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 3 }],
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 4 }],
         },
         cmp_bar_chart: {
           type: 'BarChart',
@@ -82,7 +90,20 @@ export function createInitialSharedState() {
             ],
           },
           revision: 0,
-          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 4 }],
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 5 }],
+        },
+        cmp_error_demo: {
+          type: 'MetricCard',
+          schemaVersion: 1,
+          props: {},
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'sidebar', order: 2 }],
+          status: 'error',
+          error: {
+            code: 'DEMO_ERROR',
+            message: 'This component failed to generate (demo)',
+            details: { hint: 'Use viewer-safe error details only.' },
+          },
         },
         cmp_line_chart: {
           type: 'LineChart',

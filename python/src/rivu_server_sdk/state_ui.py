@@ -13,6 +13,14 @@ class UiMountV1(BaseModel):
     order: int
 
 
+class UiComponentErrorV1(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    code: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+    details: dict[str, Any] | None = None
+
+
 class UiComponentV1(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -22,6 +30,19 @@ class UiComponentV1(BaseModel):
     state: dict[str, Any] | None = None
     revision: NonNegativeInt
     mounts: list[UiMountV1]
+    status: Literal["building", "ready", "error"] | None = None
+    error: UiComponentErrorV1 | None = None
+
+    @model_validator(mode="after")
+    def _validate_lifecycle(self) -> "UiComponentV1":
+        status = self.status or "ready"
+        if status == "error":
+            if self.error is None:
+                raise ValueError("component.error must be set when status=error")
+            return self
+        if self.error is not None:
+            raise ValueError("component.error must be omitted unless status=error")
+        return self
 
 
 class UiStateV1(BaseModel):
