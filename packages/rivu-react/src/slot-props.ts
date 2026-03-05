@@ -25,6 +25,19 @@ export type RivuSlotProps = {
     approveButton?: RivuSlotPropOverrides;
     denyButton?: RivuSlotPropOverrides;
   };
+  ConfirmCard?: {
+    root?: RivuSlotPropOverrides;
+    status?: RivuSlotPropOverrides;
+    actions?: RivuSlotPropOverrides;
+    confirmButton?: RivuSlotPropOverrides;
+    cancelButton?: RivuSlotPropOverrides;
+  };
+  TaskStatusCard?: {
+    root?: RivuSlotPropOverrides;
+    status?: RivuSlotPropOverrides;
+    progress?: RivuSlotPropOverrides;
+    message?: RivuSlotPropOverrides;
+  };
   FormCard?: {
     root?: RivuSlotPropOverrides;
     status?: RivuSlotPropOverrides;

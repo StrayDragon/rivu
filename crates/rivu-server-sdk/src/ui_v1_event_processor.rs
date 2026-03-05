@@ -176,6 +176,24 @@ fn apply_component_event(component: &UiComponentV1, event: &UiV1CustomEvent) -> 
             state.entry("decidedAtMs").or_insert_with(|| Value::Number(Number::from(now_ms())));
             Ok((Value::Object(state), component.revision + 1))
         }
+        "ConfirmCard" => {
+            match event.value.event_name.as_str() {
+                "confirm" => {
+                    state.insert("status".into(), Value::String("confirmed".into()));
+                }
+                "cancel" => {
+                    state.insert("status".into(), Value::String("cancelled".into()));
+                }
+                other => {
+                    return Err(UiV1EventProcessorError::InvalidPayload(format!(
+                        "unsupported ConfirmCard eventName: {}",
+                        other
+                    )))
+                }
+            }
+            state.entry("decidedAtMs").or_insert_with(|| Value::Number(Number::from(now_ms())));
+            Ok((Value::Object(state), component.revision + 1))
+        }
         "Chart" => match event.value.event_name.as_str() {
             "chart.clearSelection" => {
                 state.insert("selection".into(), json!({ "kind": "none" }));

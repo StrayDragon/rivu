@@ -111,9 +111,19 @@ const EXAMPLES = {
       description: 'Approve/deny sends ui.v1.event; server emits STATE_DELTA.',
     },
     {
+      componentId: 'cmp_confirm',
+      title: 'ConfirmCard',
+      description: 'Confirm/cancel sends ui.v1.event; server commits state via STATE_DELTA.',
+    },
+    {
       componentId: 'cmp_form',
       title: 'FormCard',
       description: 'Edits + submit are server-authoritative (baseRevision enforced).',
+    },
+    {
+      componentId: 'cmp_task_status',
+      title: 'TaskStatusCard',
+      description: 'Stateless task status. Server patches props (progress/message/status).',
     },
     {
       componentId: 'cmp_chart_workflow',

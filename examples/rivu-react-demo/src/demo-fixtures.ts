@@ -221,6 +221,32 @@ export function createInitialSharedState() {
           revision: 0,
           mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 2 }],
         },
+        cmp_confirm: {
+          type: 'ConfirmCard',
+          schemaVersion: 1,
+          props: {
+            title: 'ConfirmCard',
+            description: 'Workflow component. Confirm/cancel emits ui.v1.event and waits for server commit via STATE_DELTA.',
+            confirmLabel: 'Confirm (demo)',
+            cancelLabel: 'Cancel',
+          },
+          state: { status: 'pending' },
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 3 }],
+        },
+        cmp_task_status: {
+          type: 'TaskStatusCard',
+          schemaVersion: 1,
+          props: {
+            title: 'TaskStatusCard',
+            description: 'Stateless component. Demo server patches props (progress/message/status) via STATE_DELTA.',
+            status: 'queued',
+            progress: 0.05,
+            message: 'Queued (demo)…',
+          },
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 4 }],
+        },
       },
     },
   };

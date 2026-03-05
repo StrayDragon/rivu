@@ -112,6 +112,55 @@ export function createMockServer(params: {
         emitDelta([{ op: 'replace', path: `/ui/components/${ptr}/status`, value: 'ready' }]);
       }, 1050),
     );
+
+    // Demo: TaskStatusCard server-driven progress updates (props-only, replayable).
+    const taskStatusId = 'cmp_task_status';
+    const taskStatusComponent = (componentsRaw as any)[taskStatusId] as any;
+    if (taskStatusComponent) {
+      const taskPtr = encodePointer(taskStatusId);
+
+      lifecycleTimeouts.push(
+        window.setTimeout(() => {
+          taskStatusComponent.props = { ...(taskStatusComponent.props ?? {}), status: 'running', progress: 0.18, message: 'Starting…' };
+          emitDelta([
+            { op: 'add', path: `/ui/components/${taskPtr}/props/status`, value: 'running' },
+            { op: 'add', path: `/ui/components/${taskPtr}/props/progress`, value: 0.18 },
+            { op: 'add', path: `/ui/components/${taskPtr}/props/message`, value: 'Starting…' },
+          ]);
+        }, 450),
+      );
+
+      lifecycleTimeouts.push(
+        window.setTimeout(() => {
+          taskStatusComponent.props = { ...(taskStatusComponent.props ?? {}), progress: 0.54, message: 'Running…' };
+          emitDelta([
+            { op: 'add', path: `/ui/components/${taskPtr}/props/progress`, value: 0.54 },
+            { op: 'add', path: `/ui/components/${taskPtr}/props/message`, value: 'Running…' },
+          ]);
+        }, 900),
+      );
+
+      lifecycleTimeouts.push(
+        window.setTimeout(() => {
+          taskStatusComponent.props = { ...(taskStatusComponent.props ?? {}), progress: 0.86, message: 'Almost done…' };
+          emitDelta([
+            { op: 'add', path: `/ui/components/${taskPtr}/props/progress`, value: 0.86 },
+            { op: 'add', path: `/ui/components/${taskPtr}/props/message`, value: 'Almost done…' },
+          ]);
+        }, 1350),
+      );
+
+      lifecycleTimeouts.push(
+        window.setTimeout(() => {
+          taskStatusComponent.props = { ...(taskStatusComponent.props ?? {}), status: 'succeeded', progress: 1, message: 'Done.' };
+          emitDelta([
+            { op: 'add', path: `/ui/components/${taskPtr}/props/status`, value: 'succeeded' },
+            { op: 'add', path: `/ui/components/${taskPtr}/props/progress`, value: 1 },
+            { op: 'add', path: `/ui/components/${taskPtr}/props/message`, value: 'Done.' },
+          ]);
+        }, 1800),
+      );
+    }
   };
 
   const processUiV1Event = (action: UiV1CustomEvent): ProcessResult => {
@@ -143,6 +192,14 @@ export function createMockServer(params: {
       state.status = value.eventName === 'approve' ? 'approved' : 'denied';
       if (typeof state.decidedAtMs !== 'number') state.decidedAtMs = nowMs();
       state.decidedBy = 'demo-server';
+    } else if (componentType === 'ConfirmCard') {
+      if (value.eventName !== 'confirm' && value.eventName !== 'cancel') {
+        throw new Error(`unsupported ConfirmCard eventName: ${value.eventName}`);
+      }
+      state.status = value.eventName === 'confirm' ? 'confirmed' : 'cancelled';
+      if (typeof state.decidedAtMs !== 'number') state.decidedAtMs = nowMs();
+      state.decidedBy = 'demo-server';
+      state.message = value.eventName === 'confirm' ? 'Confirmed (demo server commit).' : 'Cancelled (demo server commit).';
     } else if (componentType === 'Chart') {
       if (value.eventName === 'chart.clearSelection') {
         state.selection = { kind: 'none' };

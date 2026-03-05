@@ -140,6 +140,13 @@ class UiV1EventProcessor:
             state.setdefault("decidedAtMs", self.now_ms())
             return component.model_copy(update={"state": state, "revision": revision + 1})
 
+        if component.type == "ConfirmCard":
+            if event_name not in ("confirm", "cancel"):
+                raise InvalidPayloadError(f"unsupported ConfirmCard eventName: {event_name}")
+            state["status"] = "confirmed" if event_name == "confirm" else "cancelled"
+            state.setdefault("decidedAtMs", self.now_ms())
+            return component.model_copy(update={"state": state, "revision": revision + 1})
+
         if component.type == "Chart":
             if event_name == "chart.clearSelection":
                 state["selection"] = {"kind": "none"}

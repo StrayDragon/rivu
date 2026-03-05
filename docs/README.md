@@ -6,6 +6,7 @@ Start here (for most users):
 - `docs/integration-quickstart.md` — canonical SSE/WS → `{seq,event}` → kernel → `sharedState.ui` baseline
 - `docs/integration.md` — adoption ladder + kernel/registry + lifecycle + component catalog
 - `docs/thread-ui-kit.md` — optional Layer 2: ThreadView + ToolCards (messages, tool cards, mounts, run status)
+- `docs/workflow-cards.md` — workflow primitives: `ConfirmCard` + `TaskStatusCard` (server-authoritative)
 - `docs/agent-skills.md` — optional: agent skills bundle for integrators/maintainers
 
 For contributors (requirements + planned work):

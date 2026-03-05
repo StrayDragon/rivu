@@ -250,6 +250,63 @@ test('ApprovalCard emits ui.v1.event approve with baseRevision', async () => {
   expect(actions[0].value.clientRequestId.length).toBeGreaterThan(0);
 });
 
+test('ConfirmCard emits ui.v1.event confirm and cancel with baseRevision', async () => {
+  const actions: any[] = [];
+  const kernel = createKernel({
+    actionTransport: vi.fn(async (action) => {
+      actions.push(action);
+    }),
+  });
+
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_confirm: {
+              type: 'ConfirmCard',
+              schemaVersion: 1,
+              props: { title: 'Confirm?' },
+              state: { status: 'pending' },
+              revision: 7,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} host={workflowHost} componentId="cmp_confirm" />);
+
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  });
+
+  expect(actions.length).toBe(2);
+  expect(actions[0].type).toBe('CUSTOM');
+  expect(actions[0].name).toBe('ui.v1.event');
+  expect(actions[0].value.componentId).toBe('cmp_confirm');
+  expect(actions[0].value.eventName).toBe('confirm');
+  expect(actions[0].value.baseRevision).toBe(7);
+  expect(typeof actions[0].value.clientRequestId).toBe('string');
+  expect(actions[0].value.clientRequestId.length).toBeGreaterThan(0);
+
+  expect(actions[1].type).toBe('CUSTOM');
+  expect(actions[1].name).toBe('ui.v1.event');
+  expect(actions[1].value.componentId).toBe('cmp_confirm');
+  expect(actions[1].value.eventName).toBe('cancel');
+  expect(actions[1].value.baseRevision).toBe(7);
+  expect(typeof actions[1].value.clientRequestId).toBe('string');
+  expect(actions[1].value.clientRequestId.length).toBeGreaterThan(0);
+});
+
 test('FormCard emits ui.v1.event setField and submit', async () => {
   const actions: any[] = [];
   const kernel = createKernel({
@@ -308,4 +365,36 @@ test('FormCard emits ui.v1.event setField and submit', async () => {
   expect(actions[1].value.eventName).toBe('submit');
   expect(actions[1].value.payload.values.name).toBe('Ada');
   expect(actions[1].value.baseRevision).toBe(3);
+});
+
+test('TaskStatusCard renders status and progress', () => {
+  const kernel = createKernel();
+
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_task_status: {
+              type: 'TaskStatusCard',
+              schemaVersion: 1,
+              props: { title: 'Deploy', status: 'running', progress: 0.42, message: 'Working…' },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} host={workflowHost} componentId="cmp_task_status" />);
+
+  expect(screen.getByText('Deploy')).toBeTruthy();
+  expect(screen.getByText('running')).toBeTruthy();
+  expect(screen.getByText('42%')).toBeTruthy();
+  expect(screen.getByText('Working…')).toBeTruthy();
 });
