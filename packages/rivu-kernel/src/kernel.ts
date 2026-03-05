@@ -2,6 +2,7 @@ import { EventSchemas } from '@ag-ui/core';
 import { applyPatch } from 'fast-json-patch';
 import {
   UI_V1_EVENT_NAME,
+  type UiInputLimitsV1,
   uiV1CustomEventSchema,
   uiV1EventValueSchema,
   type UiV1CustomEvent,
@@ -43,8 +44,9 @@ export type OutboxEntry = {
 export type RivuKernelState = {
   lastSeq: number;
   needsResync: boolean;
-  resyncReason: 'gap' | 'patch_error' | null;
+  resyncReason: 'gap' | 'patch_error' | 'limit_exceeded' | null;
   gap: { expectedSeq: number; gotSeq: number } | null;
+  limitExceeded: { limit: string; max: number; observed: number; path?: string } | null;
   sharedState: Record<string, unknown>;
   messages: Record<string, RivuKernelMessage>;
   messageOrder: string[];
@@ -58,7 +60,7 @@ export type DispatchResult =
   | { status: 'duplicate'; seq: number }
   | { status: 'gap'; expectedSeq: number; gotSeq: number }
   | { status: 'invalid'; error: unknown }
-  | { status: 'needs_resync'; reason: 'patch_error' };
+  | { status: 'needs_resync'; reason: 'patch_error' | 'limit_exceeded' };
 
 export type SendResult =
   | { status: 'sent'; clientRequestId: string }
@@ -77,6 +79,7 @@ export type CreateKernelOptions = {
   actionTransport?: RivuKernelActionTransport;
   allowedCustomEventNames?: ReadonlySet<string>;
   nowMs?: () => number;
+  limits?: UiInputLimitsV1;
 };
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
@@ -93,6 +96,7 @@ function initialState(): RivuKernelState {
     needsResync: false,
     resyncReason: null,
     gap: null,
+    limitExceeded: null,
     sharedState: {},
     messages: {},
     messageOrder: [],
@@ -106,6 +110,7 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
   const nowMs = options.nowMs ?? defaultNowMs;
   const allowedCustomEventNames = options.allowedCustomEventNames ?? new Set([UI_V1_EVENT_NAME]);
   const actionTransport = options.actionTransport ?? null;
+  const limits = options.limits ?? null;
 
   let state = initialState();
   const listeners = new Set<() => void>();
@@ -151,6 +156,7 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
         needsResync: true,
         resyncReason: 'gap',
         gap: { expectedSeq: state.lastSeq + 1, gotSeq: seq },
+        limitExceeded: null,
       });
       return { status: 'gap', expectedSeq: state.lastSeq + 1, gotSeq: seq };
     }
@@ -185,8 +191,26 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
     if (event.type === 'STATE_SNAPSHOT') {
       const snapshot = (event as any).snapshot as unknown;
       if (!isJsonObject(snapshot)) {
-        setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null });
+        setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null, limitExceeded: null });
         return { status: 'needs_resync', reason: 'patch_error' };
+      }
+      const uiStateMaxComponents = limits?.uiState?.maxComponents;
+      if (uiStateMaxComponents != null) {
+        const ui = (snapshot as any).ui;
+        const components = ui && typeof ui === 'object' && !Array.isArray(ui) ? (ui as any).components : null;
+        if (components && typeof components === 'object' && !Array.isArray(components)) {
+          const observed = Object.keys(components).length;
+          if (observed > uiStateMaxComponents) {
+            setState({
+              ...state,
+              needsResync: true,
+              resyncReason: 'limit_exceeded',
+              gap: null,
+              limitExceeded: { limit: 'uiState.maxComponents', max: uiStateMaxComponents, observed },
+            });
+            return { status: 'needs_resync', reason: 'limit_exceeded' };
+          }
+        }
       }
       setState({
         ...state,
@@ -194,6 +218,7 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
         needsResync: false,
         resyncReason: null,
         gap: null,
+        limitExceeded: null,
         sharedState: structuredClone(snapshot),
       });
       return { status: 'applied', seq };
@@ -202,14 +227,44 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
     if (event.type === 'STATE_DELTA') {
       const delta = (event as any).delta as unknown;
       if (!Array.isArray(delta)) {
-        setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null });
+        setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null, limitExceeded: null });
         return { status: 'needs_resync', reason: 'patch_error' };
+      }
+      const maxOps = limits?.jsonPatch?.maxOps;
+      if (maxOps != null && delta.length > maxOps) {
+        setState({
+          ...state,
+          needsResync: true,
+          resyncReason: 'limit_exceeded',
+          gap: null,
+          limitExceeded: { limit: 'jsonPatch.maxOps', max: maxOps, observed: delta.length },
+        });
+        return { status: 'needs_resync', reason: 'limit_exceeded' };
+      }
+
+      const allowedPathPrefixes = limits?.jsonPatch?.allowedPathPrefixes;
+      if (allowedPathPrefixes && allowedPathPrefixes.length > 0) {
+        for (const op of delta) {
+          const path = (op as any)?.path;
+          if (typeof path !== 'string') continue;
+          const ok = allowedPathPrefixes.some((prefix) => path.startsWith(prefix));
+          if (!ok) {
+            setState({
+              ...state,
+              needsResync: true,
+              resyncReason: 'limit_exceeded',
+              gap: null,
+              limitExceeded: { limit: 'jsonPatch.allowedPathPrefixes', max: 0, observed: 1, path },
+            });
+            return { status: 'needs_resync', reason: 'limit_exceeded' };
+          }
+        }
       }
       try {
         const result = applyPatch(state.sharedState, delta as any[], true, false);
         const nextSharedState = result.newDocument as unknown;
         if (!isJsonObject(nextSharedState)) {
-          setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null });
+          setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null, limitExceeded: null });
           return { status: 'needs_resync', reason: 'patch_error' };
         }
         setState({
@@ -218,11 +273,12 @@ export function createKernel(options: CreateKernelOptions = {}): RivuKernel {
           needsResync: false,
           resyncReason: null,
           gap: null,
+          limitExceeded: null,
           sharedState: nextSharedState,
         });
         return { status: 'applied', seq };
       } catch {
-        setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null });
+        setState({ ...state, needsResync: true, resyncReason: 'patch_error', gap: null, limitExceeded: null });
         return { status: 'needs_resync', reason: 'patch_error' };
       }
     }

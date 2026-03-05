@@ -245,6 +245,129 @@
       }
     ]
   },
+  "limitsV1": {
+    "uiEvent": [
+      {
+        "id": "uiEvent_maxPayloadKeys_ok_at_limit",
+        "limits": {
+          "uiEvent": { "maxPayloadKeys": 2 }
+        },
+        "input": {
+          "type": "CUSTOM",
+          "name": "ui.v1.event",
+          "value": {
+            "componentId": "cmp_1",
+            "eventName": "submit",
+            "payload": { "a": 1, "b": 2 },
+            "clientRequestId": "req_limit_ok",
+            "baseRevision": 0
+          }
+        },
+        "expect": { "ok": true }
+      },
+      {
+        "id": "uiEvent_maxPayloadKeys_exceeded",
+        "limits": {
+          "uiEvent": { "maxPayloadKeys": 2 }
+        },
+        "input": {
+          "type": "CUSTOM",
+          "name": "ui.v1.event",
+          "value": {
+            "componentId": "cmp_1",
+            "eventName": "submit",
+            "payload": { "a": 1, "b": 2, "c": 3 },
+            "clientRequestId": "req_limit_bad",
+            "baseRevision": 0
+          }
+        },
+        "expect": {
+          "ok": false,
+          "error": { "code": "LIMIT_EXCEEDED", "limit": "uiEvent.maxPayloadKeys", "max": 2, "observed": 3 }
+        }
+      }
+    ],
+    "jsonPatch": [
+      {
+        "id": "jsonPatch_maxOps_ok_at_limit",
+        "limits": {
+          "jsonPatch": { "maxOps": 1 }
+        },
+        "input": [
+          { "op": "replace", "path": "/ui/components/cmp_1/props/value", "value": 1 }
+        ],
+        "expect": { "ok": true }
+      },
+      {
+        "id": "jsonPatch_maxOps_exceeded",
+        "limits": {
+          "jsonPatch": { "maxOps": 1 }
+        },
+        "input": [
+          { "op": "replace", "path": "/ui/components/cmp_1/props/value", "value": 1 },
+          { "op": "replace", "path": "/ui/components/cmp_1/props/value", "value": 2 }
+        ],
+        "expect": {
+          "ok": false,
+          "error": { "code": "LIMIT_EXCEEDED", "limit": "jsonPatch.maxOps", "max": 1, "observed": 2 }
+        }
+      }
+    ],
+    "uiState": [
+      {
+        "id": "uiState_maxComponents_ok_at_limit",
+        "limits": {
+          "uiState": { "maxComponents": 1 }
+        },
+        "input": {
+          "ui": {
+            "v": 1,
+            "components": {
+              "cmp_1": {
+                "type": "MetricCard",
+                "schemaVersion": 1,
+                "props": { "label": "Revenue", "value": 1 },
+                "revision": 0,
+                "mounts": []
+              }
+            }
+          }
+        },
+        "expect": { "ok": true }
+      },
+      {
+        "id": "uiState_maxComponents_exceeded",
+        "limits": {
+          "uiState": { "maxComponents": 1 }
+        },
+        "input": {
+          "ui": {
+            "v": 1,
+            "components": {
+              "cmp_1": {
+                "type": "MetricCard",
+                "schemaVersion": 1,
+                "props": { "label": "Revenue", "value": 1 },
+                "revision": 0,
+                "mounts": []
+              },
+              "cmp_2": {
+                "type": "MetricCard",
+                "schemaVersion": 1,
+                "props": { "label": "Profit", "value": 2 },
+                "revision": 0,
+                "mounts": []
+              }
+            }
+          }
+        },
+        "expect": {
+          "ok": false,
+          "error": { "code": "LIMIT_EXCEEDED", "limit": "uiState.maxComponents", "max": 1, "observed": 2 }
+        }
+      }
+    ]
+  },
   "reduce": [
     {
       "id": "snapshot_basic",
@@ -555,4 +678,3 @@
     }
   ]
 }
-

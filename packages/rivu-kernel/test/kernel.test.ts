@@ -44,6 +44,94 @@ test('dispatch: patch error triggers resync without advancing lastSeq', () => {
   expect(kernel.getState().gap).toBe(null);
 });
 
+test('dispatch: limit_exceeded rejects STATE_DELTA without advancing lastSeq', () => {
+  const kernel = createKernel({
+    limits: { jsonPatch: { maxOps: 1 } } as any,
+  });
+
+  kernel.dispatch({
+    seq: 1,
+    event: { type: 'STATE_SNAPSHOT', snapshot: { ui: { v: 1, components: {} } } },
+  });
+
+  const before = kernel.getState().sharedState;
+  const r2 = kernel.dispatch({
+    seq: 2,
+    event: {
+      type: 'STATE_DELTA',
+      delta: [
+        { op: 'replace', path: '/ui/v', value: 1 },
+        { op: 'replace', path: '/ui/v', value: 1 },
+      ],
+    },
+  });
+
+  expect(r2).toEqual({ status: 'needs_resync', reason: 'limit_exceeded' });
+  expect(kernel.getState().lastSeq).toBe(1);
+  expect(kernel.getState().needsResync).toBe(true);
+  expect(kernel.getState().resyncReason).toBe('limit_exceeded');
+  expect(kernel.getState().limitExceeded).toEqual({ limit: 'jsonPatch.maxOps', max: 1, observed: 2 });
+  expect(kernel.getState().sharedState).toEqual(before);
+});
+
+test('dispatch: limit_exceeded rejects STATE_DELTA with disallowed path prefixes', () => {
+  const kernel = createKernel({
+    limits: { jsonPatch: { allowedPathPrefixes: ['/ui'] } } as any,
+  });
+
+  kernel.dispatch({
+    seq: 1,
+    event: { type: 'STATE_SNAPSHOT', snapshot: { ui: { v: 1, components: {} } } },
+  });
+
+  const r2 = kernel.dispatch({
+    seq: 2,
+    event: {
+      type: 'STATE_DELTA',
+      delta: [{ op: 'add', path: '/messages/0/content', value: 'nope' }],
+    },
+  });
+
+  expect(r2).toEqual({ status: 'needs_resync', reason: 'limit_exceeded' });
+  expect(kernel.getState().lastSeq).toBe(1);
+  expect(kernel.getState().resyncReason).toBe('limit_exceeded');
+  expect(kernel.getState().limitExceeded).toEqual({
+    limit: 'jsonPatch.allowedPathPrefixes',
+    max: 0,
+    observed: 1,
+    path: '/messages/0/content',
+  });
+});
+
+test('dispatch: limit_exceeded rejects STATE_SNAPSHOT when uiState.maxComponents exceeded', () => {
+  const kernel = createKernel({
+    limits: { uiState: { maxComponents: 1 } } as any,
+  });
+
+  const r1 = kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_1: { type: 'MetricCard', schemaVersion: 1, props: {}, revision: 0, mounts: [] },
+            cmp_2: { type: 'MetricCard', schemaVersion: 1, props: {}, revision: 0, mounts: [] },
+          },
+        },
+      },
+    },
+  });
+
+  expect(r1).toEqual({ status: 'needs_resync', reason: 'limit_exceeded' });
+  expect(kernel.getState().lastSeq).toBe(0);
+  expect(kernel.getState().sharedState).toEqual({});
+  expect(kernel.getState().needsResync).toBe(true);
+  expect(kernel.getState().resyncReason).toBe('limit_exceeded');
+  expect(kernel.getState().limitExceeded).toEqual({ limit: 'uiState.maxComponents', max: 1, observed: 2 });
+});
+
 test('dispatch: unknown custom event name is rejected by default', () => {
   const kernel = createKernel();
 

@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import { uiStateV1Schema } from '../src/state-ui.js';
 import { uiV1CustomEventSchema, uiV1EventValueSchema } from '../src/ui-v1-event.js';
+import { uiInputLimitsV1Schema } from '../src/limits.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +18,7 @@ async function main() {
   const uiV1EventValueJsonSchema = uiV1EventValueSchema.toJSONSchema();
   const uiV1CustomEventJsonSchema = uiV1CustomEventSchema.toJSONSchema();
   const uiStateV1JsonSchema = uiStateV1Schema.toJSONSchema();
+  const uiInputLimitsV1JsonSchema = uiInputLimitsV1Schema.toJSONSchema();
 
   const outPath = path.join(__dirname, '..', 'src', 'json-schema.generated.ts');
   const content = [
@@ -26,6 +28,8 @@ async function main() {
     toConstExport('uiV1CustomEventJsonSchema', uiV1CustomEventJsonSchema),
     '\n',
     toConstExport('uiStateV1JsonSchema', uiStateV1JsonSchema),
+    '\n',
+    toConstExport('uiInputLimitsV1JsonSchema', uiInputLimitsV1JsonSchema),
     '',
   ].join('');
 

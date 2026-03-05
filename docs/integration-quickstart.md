@@ -50,6 +50,39 @@ const kernel = createKernel({
 });
 ```
 
+### Limits（推荐）
+
+Rivu 会把所有 inbound 的结构化 JSON（`ui.v1.event` / `sharedState.ui` / JSON Patch）视为不可信输入。  
+建议为 kernel 配置 `limits`，防止 UI “爆炸”与 DoS，并在超限时得到可诊断信息。
+
+使用官方推荐默认值（Viewer / Workflow 两种 profile）：
+
+```ts
+import { createKernel } from 'rivu-kernel';
+import { viewerDefaults, workflowDefaults } from 'rivu-ui-spec';
+
+const kernel = createKernel({
+  limits: viewerDefaults, // or: workflowDefaults
+  actionTransport: async (action) => {
+    // POST `ui.v1.event` to your backend
+  },
+});
+```
+
+覆盖单个字段示例（只收紧 `jsonPatch.maxOps`，其余保持默认）：
+
+```ts
+import { createKernel } from 'rivu-kernel';
+import { viewerDefaults } from 'rivu-ui-spec';
+
+const kernel = createKernel({
+  limits: {
+    ...viewerDefaults,
+    jsonPatch: { ...viewerDefaults.jsonPatch, maxOps: 500 },
+  },
+});
+```
+
 Dispatch every server envelope:
 
 ```ts
@@ -98,9 +131,12 @@ Recommended reconnect strategy:
 
 If the kernel detects a sequence gap or a patch error, it will set:
 - `needsResync = true`
-- `resyncReason = "gap" | "patch_error"`
+- `resyncReason = "gap" | "patch_error" | "limit_exceeded"`
 
 Use those signals to trigger replay/snapshot and restore a consistent `sharedState`.
+
+当 `resyncReason = "limit_exceeded"` 时，kernel 还会设置结构化诊断字段：
+- `limitExceeded = { limit, max, observed, path? }`
 
 ## 4) Render UI from `sharedState.ui` mounts (React)
 

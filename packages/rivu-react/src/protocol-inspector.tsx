@@ -95,6 +95,7 @@ export function ProtocolInspector(props: ProtocolInspectorProps) {
     lastSeq: s.lastSeq,
     needsResync: s.needsResync,
     resyncReason: s.resyncReason,
+    limitExceeded: s.limitExceeded,
     gap: s.gap,
     outbox: summarizeOutbox(s.outbox, maxOutboxEntries),
     'sharedState.ui': summarizeUiV1((s.sharedState as any)?.ui, maxUiComponents),
@@ -107,4 +108,3 @@ export function ProtocolInspector(props: ProtocolInspectorProps) {
     </div>
   );
 }
-

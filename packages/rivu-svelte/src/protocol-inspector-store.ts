@@ -28,7 +28,8 @@ type UiSummary =
 export type ProtocolInspectorSnapshot = {
   lastSeq: number;
   needsResync: boolean;
-  resyncReason: 'gap' | 'patch_error' | null;
+  resyncReason: 'gap' | 'patch_error' | 'limit_exceeded' | null;
+  limitExceeded: { limit: string; max: number; observed: number; path?: string } | null;
   gap: { expectedSeq: number; gotSeq: number } | null;
   outbox: OutboxSummary;
   'sharedState.ui': UiSummary;
@@ -103,6 +104,7 @@ function getSnapshot(kernel: RivuKernel, options: ProtocolInspectorStoreOptions)
     lastSeq: state.lastSeq,
     needsResync: state.needsResync,
     resyncReason: state.resyncReason,
+    limitExceeded: state.limitExceeded,
     gap: state.gap,
     outbox: summarizeOutbox(state.outbox, maxOutboxEntries),
     'sharedState.ui': summarizeUiV1((state.sharedState as any)?.ui, maxUiComponents),
@@ -112,4 +114,3 @@ function getSnapshot(kernel: RivuKernel, options: ProtocolInspectorStoreOptions)
 export function protocolInspectorStore(kernel: RivuKernel, options: ProtocolInspectorStoreOptions = {}): Readable<ProtocolInspectorSnapshot> {
   return readable(getSnapshot(kernel, options), (set) => kernel.subscribe(() => set(getSnapshot(kernel, options))));
 }
-
