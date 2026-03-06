@@ -1,14 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { z } from 'zod';
 
 import type { RivuKernel } from 'rivu-kernel';
 import {
   UI_V1_EVENT_NAME,
+  fileUploadCardPropsV1Schema,
+  fileUploadCardStateV1Schema,
   multiStepWizardPropsV1Schema,
   multiStepWizardStateV1Schema,
+  type FileUploadCardPropsV1,
+  type FileUploadCardStateV1,
   type MultiStepWizardPropsV1,
   type MultiStepWizardStateV1,
+  type UploadedFileRefV1,
   type UiV1CustomEvent,
 } from 'rivu-ui-spec';
 
@@ -24,6 +29,7 @@ const theme = {
   fgMuted: 'var(--rivu-fg-muted, #4b5563)',
   muted: 'var(--rivu-muted, #6b7280)',
   border: 'var(--rivu-border, #e5e7eb)',
+  borderMuted: 'var(--rivu-border-muted, #f3f4f6)',
   radius: 'var(--rivu-radius, 14px)',
   radiusSm: 'var(--rivu-radius-sm, 10px)',
   shadow: 'var(--rivu-shadow, none)',
@@ -1399,6 +1405,335 @@ export const multiStepWizardRegistrationV1: RivuComponentRegistration<MultiStepW
     <MultiStepWizard host={host} kernel={kernel} componentId={componentId} revision={revision} state={state} {...props} />
   ),
 };
+
+export const FILE_UPLOAD_CARD_COMPONENT_TYPE = 'FileUploadCard' as const;
+export const FILE_UPLOAD_CARD_SCHEMA_VERSION = 1 as const;
+
+type FileUploadCardEventNameV1 = 'file.add' | 'file.remove' | 'file.submit';
+
+export type UploadFileHookV1 = (file: File, meta: { componentId: string }) => Promise<UploadedFileRefV1>;
+
+type LocalUploadState = {
+  localId: string;
+  fileName: string;
+  sizeBytes: number;
+  status: 'uploading' | 'awaiting_commit' | 'failed';
+  ref?: UploadedFileRefV1;
+  error?: string;
+};
+
+export type FileUploadCardSlots = {
+  FileRow?: (args: {
+    file: UploadedFileRefV1;
+    href: string | null;
+    disabled: boolean;
+    onRemove: () => void;
+  }) => ReactNode;
+  Actions?: (args: { disabled: boolean; submitLabel: string; onSubmit: () => void }) => ReactNode;
+};
+
+export function FileUploadCard(
+  props: FileUploadCardPropsV1 & {
+    host?: RivuHost;
+    kernel: RivuKernel;
+    componentId: string;
+    revision: number;
+    state: FileUploadCardStateV1 | undefined;
+    uploadFile: UploadFileHookV1;
+    className?: string;
+    style?: CSSProperties;
+    slots?: FileUploadCardSlots;
+  },
+) {
+  const hooks = props.host?.renderHooks ?? defaultRenderHooks;
+  const slotProps = props.host?.slotProps?.FileUploadCard;
+  const meta = { componentId: props.componentId, componentType: FILE_UPLOAD_CARD_COMPONENT_TYPE };
+
+  const revisionRef = useRef(props.revision);
+  useEffect(() => {
+    revisionRef.current = props.revision;
+  }, [props.revision]);
+
+  const disabled = props.state?.disabled === true || props.state?.status === 'uploading';
+  const committedFiles = props.state?.files ?? [];
+
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [uploads, setUploads] = useState<LocalUploadState[]>([]);
+
+  useEffect(() => {
+    const committedIds = new Set(committedFiles.map((f) => f.id));
+    setUploads((prev) => prev.filter((u) => !u.ref || !committedIds.has(u.ref.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.revision]);
+
+  const sendUiEvent = async (eventName: FileUploadCardEventNameV1, payload: Record<string, unknown>) => {
+    const action: UiV1CustomEvent = {
+      type: 'CUSTOM',
+      name: UI_V1_EVENT_NAME,
+      value: {
+        componentId: props.componentId,
+        eventName,
+        payload,
+        clientRequestId: createClientRequestId(),
+        baseRevision: revisionRef.current,
+      },
+    };
+    await props.kernel.send(action);
+  };
+
+  const onPickFiles = async (files: FileList | null) => {
+    if (disabled) return;
+    if (!files) return;
+
+    setLocalError(null);
+
+    const pendingCount = uploads.filter((u) => u.status !== 'failed').length;
+    const maxFiles = props.maxFiles ?? Infinity;
+    const remaining = Math.max(0, maxFiles - committedFiles.length - pendingCount);
+
+    const selected = Array.from(files).slice(0, remaining);
+    if (selected.length < files.length) {
+      setLocalError(`Too many files selected (maxFiles=${props.maxFiles}).`);
+    }
+
+    for (const file of selected) {
+      if (typeof props.maxFileSizeBytes === 'number' && file.size > props.maxFileSizeBytes) {
+        setLocalError(`File too large: ${file.name} (${file.size} bytes, maxFileSizeBytes=${props.maxFileSizeBytes}).`);
+        continue;
+      }
+
+      const localId = `${file.name}:${file.size}:${Date.now()}:${Math.random().toString(16).slice(2)}`;
+      setUploads((prev) => [...prev, { localId, fileName: file.name, sizeBytes: file.size, status: 'uploading' }]);
+
+      try {
+        const ref = await props.uploadFile(file, { componentId: props.componentId });
+        setUploads((prev) => prev.map((u) => (u.localId === localId ? { ...u, status: 'awaiting_commit', ref } : u)));
+        await sendUiEvent('file.add', { file: ref });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setUploads((prev) => prev.map((u) => (u.localId === localId ? { ...u, status: 'failed', error: msg } : u)));
+        setLocalError(msg);
+      }
+    }
+  };
+
+  const onRemoveCommitted = async (fileId: string) => {
+    if (disabled) return;
+    setLocalError(null);
+    try {
+      await sendUiEvent('file.remove', { fileId });
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const onSubmit = async () => {
+    if (disabled) return;
+    setLocalError(null);
+    try {
+      await sendUiEvent('file.submit', {});
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const status = typeof props.state?.status === 'string' ? props.state.status : undefined;
+  const message = typeof props.state?.message === 'string' ? props.state.message : undefined;
+  const submitLabel = props.submitLabel ?? (status === 'uploading' ? 'Uploading…' : 'Submit');
+
+  const rootSlot = applySlotProps(
+    {
+      className: props.className,
+      style: {
+        border: `1px solid ${theme.border}`,
+        borderRadius: theme.radius,
+        padding: 'var(--rivu-space-4, 14px)',
+        background: theme.bg,
+        boxShadow: theme.shadow,
+        ...props.style,
+      },
+    },
+    slotProps?.root,
+  );
+  const { className: rootClassName, style: rootStyle, ...rootAttrs } = rootSlot;
+
+  return (
+    <div
+      className={rootClassName}
+      style={rootStyle}
+      {...(rootAttrs as any)}
+    >
+      <div style={{ fontWeight: 650, fontSize: 'var(--rivu-font-size-base, 14px)', color: theme.fg }}>{props.title}</div>
+      {props.description ? (
+        <div style={{ marginTop: 6, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fgMuted }}>
+          {hooks.renderMarkdown(props.description, { ...meta, path: 'description' })}
+        </div>
+      ) : null}
+
+      <div
+        {...(() => {
+          const pickerSlot = applySlotProps({ style: { marginTop: 'var(--rivu-space-3, 12px)' } }, slotProps?.picker);
+          const { className, style, ...attrs } = pickerSlot;
+          return { className, style, ...attrs };
+        })()}
+      >
+        <input
+          type="file"
+          multiple={props.maxFiles === undefined || props.maxFiles > 1}
+          accept={props.accept}
+          disabled={disabled}
+          onChange={(e) => {
+            const files = e.target.files;
+            e.target.value = '';
+            void onPickFiles(files);
+          }}
+        />
+      </div>
+
+      <div
+        {...(() => {
+          const listSlot = applySlotProps({ style: { marginTop: 'var(--rivu-space-3, 12px)', display: 'flex', flexDirection: 'column', gap: 8 } }, slotProps?.list);
+          const { className, style, ...attrs } = listSlot;
+          return { className, style, ...attrs };
+        })()}
+      >
+        {committedFiles.length === 0 && uploads.length === 0 ? (
+          <div style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fgMuted }}>No files.</div>
+        ) : null}
+
+        {committedFiles.map((file) => {
+          const href = file.url ? hooks.sanitizeUrl(file.url) : null;
+
+          if (props.slots?.FileRow) {
+            return (
+              <div key={file.id}>
+                {props.slots.FileRow({
+                  file,
+                  href,
+                  disabled,
+                  onRemove: () => void onRemoveCommitted(file.id),
+                })}
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={file.id}
+              {...(() => {
+                const itemSlot = applySlotProps(
+                  { style: { display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 10px', border: `1px solid ${theme.borderMuted}`, borderRadius: theme.radiusSm } },
+                  slotProps?.listItem,
+                );
+                const { className, style, ...attrs } = itemSlot;
+                return { className, style, ...attrs };
+              })()}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', fontWeight: 600, color: theme.fg, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {href ? (
+                    <a href={href} target="_blank" rel="noreferrer" style={{ color: `var(--rivu-chart-1, #1d4ed8)`, textDecoration: 'none' }}>
+                      {file.name}
+                    </a>
+                  ) : (
+                    file.name
+                  )}
+                </div>
+                <div style={{ marginTop: 2, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fgMuted }}>
+                  {hooks.formatNumber(file.sizeBytes, { ...meta, path: `files.${file.id}.sizeBytes` })} bytes
+                  {file.mimeType ? ` • ${file.mimeType}` : ''}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                {...(() => {
+                  const removeSlot = applySlotProps({ style: { ...buttonStyle('default'), opacity: disabled ? 0.7 : 1 } }, slotProps?.removeButton);
+                  const { className, style, ...attrs } = removeSlot;
+                  return { className, style, ...attrs };
+                })()}
+                disabled={disabled}
+                onClick={() => void onRemoveCommitted(file.id)}
+              >
+                Remove
+              </button>
+            </div>
+          );
+        })}
+
+        {uploads.map((u) => (
+          <div key={u.localId} style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fgMuted, display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {u.fileName} • {u.sizeBytes} bytes
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {u.status === 'uploading' ? <span>Uploading…</span> : null}
+              {u.status === 'awaiting_commit' ? <span>Waiting for server commit…</span> : null}
+              {u.status === 'failed' ? <span style={{ color: theme.chart4 }}>Upload failed</span> : null}
+              {u.status === 'failed' ? (
+                <button
+                  type="button"
+                  style={{ ...buttonStyle('default') }}
+                  onClick={() => setUploads((prev) => prev.filter((x) => x.localId !== u.localId))}
+                >
+                  Dismiss
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {status || message || localError ? (
+        <div style={{ marginTop: 10, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fgMuted, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {status ? (
+            <div>
+              status: <span style={{ fontWeight: 650 }}>{status}</span>
+            </div>
+          ) : null}
+          {message ? <div>{message}</div> : null}
+          {localError ? <div style={{ color: theme.chart4 }}>{localError}</div> : null}
+        </div>
+      ) : null}
+
+      <div
+        {...(() => {
+          const actionsSlot = applySlotProps({ style: { marginTop: 'var(--rivu-space-4, 14px)', display: 'flex', gap: 10 } }, slotProps?.actions);
+          const { className, style, ...attrs } = actionsSlot;
+          return { className, style, ...attrs };
+        })()}
+      >
+        {props.slots?.Actions ? (
+          props.slots.Actions({ disabled, submitLabel, onSubmit: () => void onSubmit() })
+        ) : (
+          <button
+            type="button"
+            {...(() => {
+              const submitSlot = applySlotProps({ style: { ...buttonStyle('primary'), opacity: disabled ? 0.7 : 1 } }, slotProps?.submitButton);
+              const { className, style, ...attrs } = submitSlot;
+              return { className, style, ...attrs };
+            })()}
+            disabled={disabled}
+            onClick={() => void onSubmit()}
+          >
+            {submitLabel}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function fileUploadCardRegistrationV1(params: { uploadFile: UploadFileHookV1 }): RivuComponentRegistration<FileUploadCardPropsV1, FileUploadCardStateV1> {
+  return {
+    schemaVersion: FILE_UPLOAD_CARD_SCHEMA_VERSION,
+    propsSchema: fileUploadCardPropsV1Schema,
+    stateSchema: fileUploadCardStateV1Schema,
+    render: ({ kernel, host, componentId, revision, props, state }) => (
+      <FileUploadCard host={host} kernel={kernel} componentId={componentId} revision={revision} state={state} uploadFile={params.uploadFile} {...props} />
+    ),
+  };
+}
 
 export const workflowRegistryV1 = {
   [APPROVAL_CARD_COMPONENT_TYPE]: approvalCardRegistrationV1,

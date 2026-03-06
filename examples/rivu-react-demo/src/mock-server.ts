@@ -277,6 +277,61 @@ export function createMockServer(params: {
       } else {
         throw new Error(`unsupported FormCard eventName: ${value.eventName}`);
       }
+    } else if (componentType === 'FileUploadCard') {
+      if (value.eventName === 'file.add') {
+        assertRecord(value.payload, 'payload must be an object');
+        const payload = value.payload as any;
+        const keys = Object.keys(payload);
+        if (keys.length !== 1 || !('file' in payload)) throw new Error('payload must have only file');
+
+        const fileRef = payload.file as unknown;
+        assertRecord(fileRef, 'payload.file must be an object');
+
+        const allowedKeys = new Set(['id', 'name', 'sizeBytes', 'mimeType', 'url']);
+        for (const k of Object.keys(fileRef)) {
+          if (!allowedKeys.has(k)) throw new Error('payload.file contains unexpected keys');
+        }
+
+        const id = (fileRef as any).id as unknown;
+        if (typeof id !== 'string' || !id.trim()) throw new Error('payload.file.id must be a non-empty string');
+        const name = (fileRef as any).name as unknown;
+        if (typeof name !== 'string' || !name.trim()) throw new Error('payload.file.name must be a non-empty string');
+
+        const sizeBytes = (fileRef as any).sizeBytes as unknown;
+        if (typeof sizeBytes !== 'number' || !Number.isInteger(sizeBytes) || sizeBytes < 0) {
+          throw new Error('payload.file.sizeBytes must be a non-negative int');
+        }
+
+        const mimeType = (fileRef as any).mimeType as unknown;
+        if (mimeType !== undefined && (typeof mimeType !== 'string' || !mimeType.trim())) {
+          throw new Error('payload.file.mimeType must be a non-empty string');
+        }
+        const url = (fileRef as any).url as unknown;
+        if (url !== undefined && (typeof url !== 'string' || !url.trim())) {
+          throw new Error('payload.file.url must be a non-empty string');
+        }
+
+        const files = Array.isArray((state as any).files) ? ([...(state as any).files] as unknown[]) : [];
+        files.push(fileRef);
+        (state as any).files = files;
+      } else if (value.eventName === 'file.remove') {
+        assertRecord(value.payload, 'payload must be an object');
+        const payload = value.payload as any;
+        const keys = Object.keys(payload);
+        if (keys.length !== 1 || !('fileId' in payload)) throw new Error('payload must have only fileId');
+
+        const fileId = payload.fileId as unknown;
+        if (typeof fileId !== 'string' || !fileId.trim()) throw new Error('payload.fileId must be a non-empty string');
+
+        const files = Array.isArray((state as any).files) ? ([...(state as any).files] as unknown[]) : [];
+        (state as any).files = files.filter((f) => !(f && typeof f === 'object' && !Array.isArray(f) && (f as any).id === fileId));
+      } else if (value.eventName === 'file.submit') {
+        assertRecord(value.payload, 'payload must be an object');
+        if (Object.keys(value.payload).length !== 0) throw new Error('payload must be empty');
+        state.status = 'submitted';
+      } else {
+        throw new Error(`unsupported FileUploadCard eventName: ${value.eventName}`);
+      }
     } else if (componentType === 'MultiStepWizard') {
       const steps = (component.props as any).steps as unknown;
       if (!Array.isArray(steps) || steps.length === 0) throw new Error('MultiStepWizard props.steps must be a non-empty array');

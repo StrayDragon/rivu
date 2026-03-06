@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "fileUploadCardPropsV1": {
+    "valid": [
+      {
+        "id": "minimal",
+        "props": { "title": "Upload files" }
+      },
+      {
+        "id": "with_limits_and_accept",
+        "props": {
+          "title": "Attach evidence",
+          "description": "Upload screenshots or logs.",
+          "accept": ".png,.jpg,.log",
+          "maxFiles": 3,
+          "maxFileSizeBytes": 10485760,
+          "submitLabel": "Submit"
+        }
+      }
+    ],
+    "invalid": [
+      { "id": "empty_title_not_allowed", "props": { "title": "" } },
+      { "id": "max_files_must_be_positive", "props": { "title": "Upload", "maxFiles": 0 } },
+      { "id": "max_file_size_must_be_positive", "props": { "title": "Upload", "maxFileSizeBytes": 0 } }
+    ]
+  },
+  "fileUploadCardStateV1": {
+    "valid": [
+      { "id": "empty_default", "state": {} },
+      {
+        "id": "with_files_and_status",
+        "state": {
+          "files": [
+            {
+              "id": "file_1",
+              "name": "error.log",
+              "sizeBytes": 1234,
+              "mimeType": "text/plain",
+              "url": "https://example.com/download/signed"
+            }
+          ],
+          "status": "idle"
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "id": "negative_size_not_allowed",
+        "state": { "files": [{ "id": "f", "name": "a.txt", "sizeBytes": -1 }] }
+      },
+      {
+        "id": "empty_url_not_allowed",
+        "state": { "files": [{ "id": "f", "name": "a.txt", "sizeBytes": 1, "url": "" }] }
+      },
+      {
+        "id": "invalid_status",
+        "state": { "files": [], "status": "done" }
+      }
+    ]
+  },
+  "fileUploadCardEventPayloadV1": {
+    "valid": [
+      {
+        "id": "add_file",
+        "event": {
+          "eventName": "file.add",
+          "payload": { "file": { "id": "file_1", "name": "a.txt", "sizeBytes": 12, "mimeType": "text/plain" } }
+        }
+      },
+      {
+        "id": "remove_file",
+        "event": { "eventName": "file.remove", "payload": { "fileId": "file_1" } }
+      },
+      {
+        "id": "submit",
+        "event": { "eventName": "file.submit", "payload": {} }
+      }
+    ],
+    "invalid": [
+      { "id": "add_missing_file", "event": { "eventName": "file.add", "payload": {} } },
+      { "id": "add_file_extra_key_not_allowed", "event": { "eventName": "file.add", "payload": { "file": { "id": "f", "name": "a", "sizeBytes": 1 }, "x": 1 } } },
+      { "id": "remove_empty_file_id", "event": { "eventName": "file.remove", "payload": { "fileId": "" } } },
+      { "id": "submit_payload_must_be_empty", "event": { "eventName": "file.submit", "payload": { "x": 1 } } },
+      { "id": "unknown_event_name", "event": { "eventName": "file.download", "payload": {} } }
+    ]
+  }
+}
+

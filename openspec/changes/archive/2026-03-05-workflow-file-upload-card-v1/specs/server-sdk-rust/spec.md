@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Rust SDK provides a built-in FileUploadCard event processor
 

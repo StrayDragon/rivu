@@ -80,6 +80,15 @@ export type RivuSlotProps = {
     submitButton?: RivuSlotPropOverrides;
     resetButton?: RivuSlotPropOverrides;
   };
+  FileUploadCard?: {
+    root?: RivuSlotPropOverrides;
+    picker?: RivuSlotPropOverrides;
+    list?: RivuSlotPropOverrides;
+    listItem?: RivuSlotPropOverrides;
+    removeButton?: RivuSlotPropOverrides;
+    actions?: RivuSlotPropOverrides;
+    submitButton?: RivuSlotPropOverrides;
+  };
 };
 
 function mergeClassName(base?: string, extra?: string): string | undefined {

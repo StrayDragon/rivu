@@ -45,6 +45,25 @@ export {
 } from './ui-multi-step-wizard.js';
 
 export type {
+  FileUploadCardAddPayloadV1,
+  FileUploadCardEventNameV1,
+  FileUploadCardEventPayloadV1,
+  FileUploadCardPropsV1,
+  FileUploadCardRemovePayloadV1,
+  FileUploadCardStateV1,
+  UploadedFileRefV1,
+} from './ui-file-upload-card.js';
+export {
+  fileUploadCardAddPayloadV1Schema,
+  fileUploadCardEventNameV1Schema,
+  fileUploadCardEventPayloadV1Schema,
+  fileUploadCardPropsV1Schema,
+  fileUploadCardRemovePayloadV1Schema,
+  fileUploadCardStateV1Schema,
+  uploadedFileRefV1Schema,
+} from './ui-file-upload-card.js';
+
+export type {
   ChartInteractionEventNameV1,
   ChartSelectionKindV1,
   ChartSelectionV1,
@@ -118,6 +137,9 @@ export {
   diffViewPropsV1JsonSchema,
   multiStepWizardPropsV1JsonSchema,
   multiStepWizardStateV1JsonSchema,
+  uploadedFileRefV1JsonSchema,
+  fileUploadCardPropsV1JsonSchema,
+  fileUploadCardStateV1JsonSchema,
   uiInputLimitsV1JsonSchema,
   uiV1CustomEventJsonSchema,
   uiV1EventValueJsonSchema,

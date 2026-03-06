@@ -307,6 +307,119 @@ fn apply_component_event(component: &UiComponentV1, event: &UiV1CustomEvent) -> 
                 other
             ))),
         },
+        "FileUploadCard" => match event.value.event_name.as_str() {
+            "file.add" => {
+                if event.value.payload.len() != 1 || !event.value.payload.contains_key("file") {
+                    return Err(UiV1EventProcessorError::InvalidPayload("payload must have only file".into()));
+                }
+
+                let file = event.value.payload.get("file").unwrap_or(&Value::Null);
+                let file_obj = file.as_object().ok_or_else(|| UiV1EventProcessorError::InvalidPayload("payload.file must be an object".into()))?;
+
+                let allowed = ["id", "name", "sizeBytes", "mimeType", "url"];
+                for key in file_obj.keys() {
+                    if !allowed.contains(&key.as_str()) {
+                        return Err(UiV1EventProcessorError::InvalidPayload(
+                            "payload.file contains unexpected keys".into(),
+                        ));
+                    }
+                }
+
+                let file_id = file_obj.get("id").and_then(Value::as_str).unwrap_or("").trim();
+                if file_id.is_empty() {
+                    return Err(UiV1EventProcessorError::InvalidPayload(
+                        "payload.file.id must be a non-empty string".into(),
+                    ));
+                }
+
+                let name = file_obj.get("name").and_then(Value::as_str).unwrap_or("").trim();
+                if name.is_empty() {
+                    return Err(UiV1EventProcessorError::InvalidPayload(
+                        "payload.file.name must be a non-empty string".into(),
+                    ));
+                }
+
+                let size_bytes = file_obj
+                    .get("sizeBytes")
+                    .and_then(Value::as_i64)
+                    .ok_or_else(|| UiV1EventProcessorError::InvalidPayload("payload.file.sizeBytes must be a non-negative int".into()))?;
+                if size_bytes < 0 {
+                    return Err(UiV1EventProcessorError::InvalidPayload(
+                        "payload.file.sizeBytes must be a non-negative int".into(),
+                    ));
+                }
+
+                if let Some(mime_type) = file_obj.get("mimeType") {
+                    let mime_type_str = mime_type.as_str().unwrap_or("").trim();
+                    if mime_type_str.is_empty() {
+                        return Err(UiV1EventProcessorError::InvalidPayload(
+                            "payload.file.mimeType must be a non-empty string".into(),
+                        ));
+                    }
+                }
+
+                if let Some(url) = file_obj.get("url") {
+                    let url_str = url.as_str().unwrap_or("").trim();
+                    if url_str.is_empty() {
+                        return Err(UiV1EventProcessorError::InvalidPayload(
+                            "payload.file.url must be a non-empty string".into(),
+                        ));
+                    }
+                }
+
+                let mut files: Vec<Value> = match state.remove("files") {
+                    Some(Value::Array(arr)) => arr,
+                    _ => Vec::new(),
+                };
+                files.push(file.clone());
+                state.insert("files".into(), Value::Array(files));
+
+                Ok((Value::Object(state), component.revision + 1))
+            }
+            "file.remove" => {
+                if event.value.payload.len() != 1 || !event.value.payload.contains_key("fileId") {
+                    return Err(UiV1EventProcessorError::InvalidPayload("payload must have only fileId".into()));
+                }
+
+                let file_id = event.value.payload.get("fileId").and_then(Value::as_str).unwrap_or("").trim();
+                if file_id.is_empty() {
+                    return Err(UiV1EventProcessorError::InvalidPayload(
+                        "payload.fileId must be a non-empty string".into(),
+                    ));
+                }
+
+                let files: Vec<Value> = match state.remove("files") {
+                    Some(Value::Array(arr)) => arr,
+                    _ => Vec::new(),
+                };
+                let mut next_files: Vec<Value> = Vec::with_capacity(files.len());
+                for item in files {
+                    let keep = item
+                        .as_object()
+                        .and_then(|o| o.get("id"))
+                        .and_then(Value::as_str)
+                        .map(|id| id != file_id)
+                        .unwrap_or(true);
+                    if keep {
+                        next_files.push(item);
+                    }
+                }
+                state.insert("files".into(), Value::Array(next_files));
+
+                Ok((Value::Object(state), component.revision + 1))
+            }
+            "file.submit" => {
+                if !event.value.payload.is_empty() {
+                    return Err(UiV1EventProcessorError::InvalidPayload("payload must be empty".into()));
+                }
+                state.insert("status".into(), Value::String("submitted".into()));
+                Ok((Value::Object(state), component.revision + 1))
+            }
+            other => Err(UiV1EventProcessorError::InvalidPayload(format!(
+                "unsupported FileUploadCard eventName: {}",
+                other
+            ))),
+        },
         "MultiStepWizard" => match event.value.event_name.as_str() {
             "wizard.setField" => {
                 if event.value.payload.len() != 2 || !event.value.payload.contains_key("fieldId") || !event.value.payload.contains_key("value") {

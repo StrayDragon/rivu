@@ -289,6 +289,73 @@ class UiV1EventProcessor:
 
             raise InvalidPayloadError(f"unsupported MultiStepWizard eventName: {event_name}")
 
+        if component.type == "FileUploadCard":
+            if event_name == "file.add":
+                if set(payload.keys()) != {"file"}:
+                    raise InvalidPayloadError("payload must have only file")
+
+                file_ref = payload.get("file")
+                if not isinstance(file_ref, dict):
+                    raise InvalidPayloadError("payload.file must be an object")
+
+                allowed = {"id", "name", "sizeBytes", "mimeType", "url"}
+                extra = set(file_ref.keys()) - allowed
+                if extra:
+                    raise InvalidPayloadError("payload.file contains unexpected keys")
+
+                file_id = file_ref.get("id")
+                if not isinstance(file_id, str) or not file_id.strip():
+                    raise InvalidPayloadError("payload.file.id must be a non-empty string")
+
+                name = file_ref.get("name")
+                if not isinstance(name, str) or not name.strip():
+                    raise InvalidPayloadError("payload.file.name must be a non-empty string")
+
+                size_bytes = file_ref.get("sizeBytes")
+                if isinstance(size_bytes, bool) or not isinstance(size_bytes, int) or size_bytes < 0:
+                    raise InvalidPayloadError("payload.file.sizeBytes must be a non-negative int")
+
+                mime_type = file_ref.get("mimeType")
+                if mime_type is not None and (not isinstance(mime_type, str) or not mime_type.strip()):
+                    raise InvalidPayloadError("payload.file.mimeType must be a non-empty string")
+
+                url = file_ref.get("url")
+                if url is not None and (not isinstance(url, str) or not url.strip()):
+                    raise InvalidPayloadError("payload.file.url must be a non-empty string")
+
+                files_state = state.get("files")
+                files_list = list(files_state) if isinstance(files_state, list) else []
+                files_list.append(file_ref)
+                state["files"] = files_list
+
+                return component.model_copy(update={"state": state, "revision": revision + 1})
+
+            if event_name == "file.remove":
+                if set(payload.keys()) != {"fileId"}:
+                    raise InvalidPayloadError("payload must have only fileId")
+
+                file_id = payload.get("fileId")
+                if not isinstance(file_id, str) or not file_id.strip():
+                    raise InvalidPayloadError("payload.fileId must be a non-empty string")
+
+                files_state = state.get("files")
+                files_list = list(files_state) if isinstance(files_state, list) else []
+                state["files"] = [
+                    f
+                    for f in files_list
+                    if not (isinstance(f, dict) and f.get("id") == file_id)
+                ]
+
+                return component.model_copy(update={"state": state, "revision": revision + 1})
+
+            if event_name == "file.submit":
+                if payload:
+                    raise InvalidPayloadError("payload must be empty")
+                state["status"] = "submitted"
+                return component.model_copy(update={"state": state, "revision": revision + 1})
+
+            raise InvalidPayloadError(f"unsupported FileUploadCard eventName: {event_name}")
+
         raise InvalidPayloadError(f"unsupported component type: {component.type}")
 
 

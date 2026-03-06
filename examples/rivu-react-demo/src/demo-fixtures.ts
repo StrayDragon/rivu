@@ -295,6 +295,21 @@ export function createInitialSharedState() {
           revision: 0,
           mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 2 }],
         },
+        cmp_upload: {
+          type: 'FileUploadCard',
+          schemaVersion: 1,
+          props: {
+            title: 'FileUploadCard',
+            description: 'Workflow component. Uploads are out-of-band; ui.v1.event carries file refs only.',
+            accept: '.png,.jpg,.log,.txt',
+            maxFiles: 3,
+            maxFileSizeBytes: 5_000_000,
+            submitLabel: 'Submit (demo)',
+          },
+          state: { files: [], status: 'idle' },
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 3 }],
+        },
         cmp_chart_workflow: {
           type: 'Chart',
           schemaVersion: 1,
@@ -314,7 +329,7 @@ export function createInitialSharedState() {
           },
           state: { selection: { kind: 'none' } },
           revision: 0,
-          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 3 }],
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 4 }],
         },
         cmp_confirm: {
           type: 'ConfirmCard',
@@ -327,7 +342,7 @@ export function createInitialSharedState() {
           },
           state: { status: 'pending' },
           revision: 0,
-          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 4 }],
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 5 }],
         },
         cmp_task_status: {
           type: 'TaskStatusCard',
@@ -340,7 +355,7 @@ export function createInitialSharedState() {
             message: 'Queued (demo)…',
           },
           revision: 0,
-          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 5 }],
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 6 }],
         },
       },
     },

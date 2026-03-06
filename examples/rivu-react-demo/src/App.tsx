@@ -13,6 +13,7 @@ import {
   ComponentRenderer,
   DATA_TABLE_COMPONENT_TYPE,
   DataTable,
+  FILE_UPLOAD_CARD_COMPONENT_TYPE,
   ProtocolInspector,
   ThreadView,
   UnknownComponentCard,
@@ -24,6 +25,7 @@ import {
   defaultRenderHooks,
   exportChartSvgsV1,
   exportHtmlV1,
+  fileUploadCardRegistrationV1,
   type RivuExportSnapshotV1,
   useKernelState,
   viewerRegistryV1,
@@ -1091,10 +1093,24 @@ function ThreadKitSection(props: { kernel: RivuKernel; registry: ReturnType<type
 
 export function App() {
   const registry = useMemo(
-    () =>
-      createRegistry({
+    () => {
+      const uploadFile = async (file: File, meta: { componentId: string }) => {
+        await new Promise((r) => window.setTimeout(r, 450));
+        const id = `${meta.componentId}_${createClientRequestId()}`;
+        const url = `https://example.com/download/${encodeURIComponent(file.name)}?id=${encodeURIComponent(id)}`;
+        return {
+          id,
+          name: file.name,
+          sizeBytes: file.size,
+          ...(file.type ? { mimeType: file.type } : {}),
+          url,
+        };
+      };
+
+      return createRegistry({
         ...viewerRegistryV1,
         ...workflowRegistryV1,
+        [FILE_UPLOAD_CARD_COMPONENT_TYPE]: fileUploadCardRegistrationV1({ uploadFile }),
         [DATA_TABLE_COMPONENT_TYPE]: {
           ...dataTableRegistrationV1,
           render: ({ kernel, host, componentId, componentType, schemaVersion, props }) => {
@@ -1172,7 +1188,8 @@ export function App() {
             return <DataTable {...props} slots={slots as any} />;
           },
         },
-      }),
+      });
+    },
     [],
   );
   const [compactNumbers, setCompactNumbers] = useState(false);

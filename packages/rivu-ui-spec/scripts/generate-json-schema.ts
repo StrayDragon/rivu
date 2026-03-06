@@ -12,6 +12,7 @@ import { pivotTablePropsV1Schema } from '../src/ui-pivot-table.js';
 import { heatmapPropsV1Schema } from '../src/ui-heatmap.js';
 import { diffViewPropsV1Schema } from '../src/ui-diff-view.js';
 import { multiStepWizardPropsV1Schema, multiStepWizardStateV1Schema } from '../src/ui-multi-step-wizard.js';
+import { fileUploadCardPropsV1Schema, fileUploadCardStateV1Schema, uploadedFileRefV1Schema } from '../src/ui-file-upload-card.js';
 import { uiInputLimitsV1Schema } from '../src/limits.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -37,6 +38,9 @@ async function main() {
   const diffViewPropsV1JsonSchema = diffViewPropsV1Schema.toJSONSchema();
   const multiStepWizardPropsV1JsonSchema = multiStepWizardPropsV1Schema.toJSONSchema();
   const multiStepWizardStateV1JsonSchema = multiStepWizardStateV1Schema.toJSONSchema();
+  const uploadedFileRefV1JsonSchema = uploadedFileRefV1Schema.toJSONSchema();
+  const fileUploadCardPropsV1JsonSchema = fileUploadCardPropsV1Schema.toJSONSchema();
+  const fileUploadCardStateV1JsonSchema = fileUploadCardStateV1Schema.toJSONSchema();
   const uiInputLimitsV1JsonSchema = uiInputLimitsV1Schema.toJSONSchema();
 
   const outPath = path.join(__dirname, '..', 'src', 'json-schema.generated.ts');
@@ -69,6 +73,12 @@ async function main() {
     toConstExport('multiStepWizardPropsV1JsonSchema', multiStepWizardPropsV1JsonSchema),
     '\n',
     toConstExport('multiStepWizardStateV1JsonSchema', multiStepWizardStateV1JsonSchema),
+    '\n',
+    toConstExport('uploadedFileRefV1JsonSchema', uploadedFileRefV1JsonSchema),
+    '\n',
+    toConstExport('fileUploadCardPropsV1JsonSchema', fileUploadCardPropsV1JsonSchema),
+    '\n',
+    toConstExport('fileUploadCardStateV1JsonSchema', fileUploadCardStateV1JsonSchema),
     '\n',
     toConstExport('uiInputLimitsV1JsonSchema', uiInputLimitsV1JsonSchema),
     '',
