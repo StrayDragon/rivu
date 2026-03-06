@@ -66,11 +66,10 @@ function downloadText(filename: string, text: string, mime: string) {
 }
 
 function openHtmlPreview(html: string) {
-  const w = window.open('', '_blank', 'noopener,noreferrer');
-  if (!w) return;
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function RivuTokenBridge(props: { children: React.ReactNode }) {
@@ -128,11 +127,29 @@ function MessageCard(props: {
   return (
     <Card
       variant="outlined"
-      onClick={() => props.onSelect(props.messageId)}
+      role="button"
+      tabIndex={0}
+      onClick={(event) => {
+        const target = event.target as HTMLElement | null;
+        const interactive = target?.closest('a,button,input,select,textarea,[role="button"],[role="link"]') as HTMLElement | null;
+        if (interactive && interactive !== event.currentTarget) return;
+        props.onSelect(props.messageId);
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        props.onSelect(props.messageId);
+      }}
       sx={{
         cursor: 'pointer',
         borderColor: props.selected ? 'primary.main' : undefined,
         boxShadow: props.selected ? 1 : 0,
+        '&:focus-visible': {
+          outline: '2px solid',
+          outlineColor: 'primary.main',
+          outlineOffset: 2,
+        },
       }}
     >
       <CardHeader

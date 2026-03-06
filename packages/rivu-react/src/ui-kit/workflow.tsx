@@ -120,6 +120,10 @@ export function ApprovalCard(
   const [localError, setLocalError] = useState<string | null>(null);
   const [sending, setSending] = useState<'approve' | 'deny' | null>(null);
 
+  useEffect(() => {
+    setLocalError(null);
+  }, [props.revision]);
+
   const sendEvent = async (eventName: 'approve' | 'deny') => {
     if (disabled) return;
     if (status !== 'pending') return;
@@ -337,6 +341,10 @@ export function ConfirmCard(
   const disabled = props.state?.disabled === true;
   const [localError, setLocalError] = useState<string | null>(null);
   const [sending, setSending] = useState<'confirm' | 'cancel' | null>(null);
+
+  useEffect(() => {
+    setLocalError(null);
+  }, [props.revision]);
 
   const sendEvent = async (eventName: 'confirm' | 'cancel') => {
     if (disabled) return;
@@ -718,6 +726,7 @@ export function FormCard(
 
   useEffect(() => {
     setValues({ ...serverValues });
+    setLocalError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.revision]);
 
@@ -1004,6 +1013,7 @@ export function MultiStepWizard(
 
   useEffect(() => {
     setValues({ ...serverValues });
+    setLocalError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.revision]);
 
@@ -1461,6 +1471,7 @@ export function FileUploadCard(
   const [uploads, setUploads] = useState<LocalUploadState[]>([]);
 
   useEffect(() => {
+    setLocalError(null);
     const committedIds = new Set(committedFiles.map((f) => f.id));
     setUploads((prev) => prev.filter((u) => !u.ref || !committedIds.has(u.ref.id)));
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -35,10 +35,22 @@ function MessageCard(props: {
   if (!message) return null;
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className="w-full text-left"
-      onClick={() => props.onSelect(props.messageId)}
+      onClick={(event) => {
+        const target = event.target as HTMLElement | null;
+        const interactive = target?.closest('a,button,input,select,textarea,[role="button"],[role="link"]') as HTMLElement | null;
+        if (interactive && interactive !== event.currentTarget) return;
+        props.onSelect(props.messageId);
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        props.onSelect(props.messageId);
+      }}
     >
       <Card className={cn('transition', props.selected ? 'ring-2 ring-ring' : 'hover:bg-muted/40')}>
         <CardContent className="p-4">
@@ -56,7 +68,7 @@ function MessageCard(props: {
           ) : null}
         </CardContent>
       </Card>
-    </button>
+    </div>
   );
 }
 

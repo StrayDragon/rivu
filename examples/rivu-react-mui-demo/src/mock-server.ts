@@ -248,10 +248,7 @@ export function createMockServer(params: {
     emit({ type: 'STATE_DELTA', delta: result.patch });
   };
 
-  const capabilitiesTransport = async (capabilities: UiV1CapabilitiesCustomEvent) => {
-    // eslint-disable-next-line no-console
-    console.log('[mock-server] received ui.v1.capabilities', capabilities.value);
-  };
+  const capabilitiesTransport = async (_capabilities: UiV1CapabilitiesCustomEvent) => {};
 
   const setDatasetRows = (datasetId: string, rows: Array<Array<string | number | null>>) => {
     const uiRaw = (sharedState as any).ui as unknown;
@@ -277,4 +274,3 @@ export function createMockServer(params: {
     getSharedState: () => sharedState,
   };
 }
-

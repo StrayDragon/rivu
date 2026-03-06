@@ -178,11 +178,10 @@ function downloadText(filename: string, text: string, mime: string) {
 }
 
 function openHtmlPreview(html: string) {
-  const w = window.open('', '_blank', 'noopener,noreferrer');
-  if (!w) return;
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener,noreferrer');
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function createExportSnapshotV1(kernel: RivuKernel): RivuExportSnapshotV1 {
@@ -267,9 +266,17 @@ function MessageCard(props: {
       className={`msg ${props.selected ? 'msgSelected' : ''}`}
       role="button"
       tabIndex={0}
-      onClick={() => props.onSelect(props.messageId)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') props.onSelect(props.messageId);
+      onClick={(event) => {
+        const target = event.target as HTMLElement | null;
+        const interactive = target?.closest('a,button,input,select,textarea,[role="button"],[role="link"]') as HTMLElement | null;
+        if (interactive && interactive !== event.currentTarget) return;
+        props.onSelect(props.messageId);
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        props.onSelect(props.messageId);
       }}
     >
       <div className="msgMeta">
@@ -935,6 +942,8 @@ function CompactionSection() {
         <label className="hint" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           maxReplayEvents
           <input
+            id="rivu_compaction_maxReplayEvents"
+            name="maxReplayEvents"
             type="number"
             min={0}
             step={50}
