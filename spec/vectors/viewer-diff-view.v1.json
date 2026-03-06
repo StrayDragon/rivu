@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "diffViewPropsV1": {
+    "valid": [
+      {
+        "id": "basic_unified_default_mode",
+        "props": {
+          "before": "a\nb\nc\n",
+          "after": "a\nb\nc\nx\n"
+        }
+      },
+      {
+        "id": "split_with_labels_and_limits",
+        "props": {
+          "title": "Before vs After",
+          "beforeLabel": "Before",
+          "afterLabel": "After",
+          "before": "line1\nline2\nline3\nline4\n",
+          "after": "line1\nline2_changed\nline3\nline4\nline5\n",
+          "mode": "split",
+          "limits": { "maxChars": 50, "maxLines": 4 }
+        }
+      },
+      {
+        "id": "empty_before_allowed",
+        "props": {
+          "before": "",
+          "after": "new\ncontent\n"
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "id": "missing_before",
+        "props": { "after": "x\n" }
+      },
+      {
+        "id": "invalid_mode",
+        "props": { "before": "a\n", "after": "b\n", "mode": "side" }
+      },
+      {
+        "id": "limits_maxChars_zero",
+        "props": { "before": "a\n", "after": "b\n", "limits": { "maxChars": 0 } }
+      },
+      {
+        "id": "limits_maxLines_zero",
+        "props": { "before": "a\n", "after": "b\n", "limits": { "maxLines": 0 } }
+      },
+      {
+        "id": "empty_title_not_allowed",
+        "props": { "before": "a\n", "after": "b\n", "title": "" }
+      },
+      {
+        "id": "empty_beforeLabel_not_allowed",
+        "props": { "before": "a\n", "after": "b\n", "beforeLabel": "" }
+      }
+    ]
+  }
+}
+

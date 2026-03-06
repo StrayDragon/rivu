@@ -1041,6 +1041,59 @@ export const heatmapPropsV1JsonSchema = {
   "additionalProperties": false
 } as const;
 
+export const diffViewPropsV1JsonSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "beforeLabel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "afterLabel": {
+      "type": "string",
+      "minLength": 1
+    },
+    "before": {
+      "type": "string"
+    },
+    "after": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "unified",
+        "split"
+      ]
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "maxChars": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maxLines": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "before",
+    "after"
+  ],
+  "additionalProperties": false
+} as const;
+
 export const uiInputLimitsV1JsonSchema = {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",

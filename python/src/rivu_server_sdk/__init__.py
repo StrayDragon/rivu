@@ -45,6 +45,7 @@ from .ui_v1_event_processor import (
     UnknownComponentError,
 )
 from .viewer_pivot_heatmap import HeatmapPropsV1, PivotTablePropsV1
+from .viewer_diff_view import DiffViewPropsV1
 
 __all__ = [
     "__version__",
@@ -102,6 +103,7 @@ __all__ = [
     "ProcessedResult",
     "PivotTablePropsV1",
     "HeatmapPropsV1",
+    "DiffViewPropsV1",
 ]
 
 __version__ = "0.1.0"

@@ -104,6 +104,11 @@ const EXAMPLES = {
       description: 'Explicit encoding (x/y/value) with token-based palette.',
     },
     {
+      componentId: 'cmp_diff_view',
+      title: 'DiffView',
+      description: 'Deterministic line-diff (unified/split) with truncation limits.',
+    },
+    {
       componentId: 'cmp_line_chart',
       title: 'LineChart',
       description: 'Simple inline points example.',
@@ -979,6 +984,7 @@ function DocsSection() {
     { title: 'Integration guide', path: 'docs/integration.md', note: 'Kernel + registry + lifecycle + component catalog.' },
     { title: 'Viewer export', path: 'docs/viewer-export.md', note: 'Snapshot → HTML/SVG/PDF export pipeline.' },
     { title: 'PivotTable & Heatmap', path: 'docs/viewer-pivot-heatmap.md', note: 'Props schema + datasets guidance + export notes.' },
+    { title: 'DiffView', path: 'docs/viewer-diff-view.md', note: 'Line-diff usage + payload sizing guidance + export expectations.' },
     { title: 'Export & review', path: 'docs/export-review.md', note: 'Snapshot/export baseline and restoration.' },
     { title: 'Event compaction', path: 'docs/event-compaction.md', note: 'Server-side flush/merge + snapshot tuning.' },
     { title: 'Design system', path: 'docs/design-system.md', note: 'Theme tokens + slots conventions.' },

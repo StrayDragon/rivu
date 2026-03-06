@@ -3,7 +3,15 @@ import type { ReactNode } from 'react';
 import { z } from 'zod';
 
 import { selectUiDatasetV1 } from 'rivu-kernel';
-import { heatmapPropsV1Schema, pivotTablePropsV1Schema, uiDataRefV1Schema, type HeatmapPropsV1, type PivotTablePropsV1 } from 'rivu-ui-spec';
+import {
+  diffViewPropsV1Schema,
+  heatmapPropsV1Schema,
+  pivotTablePropsV1Schema,
+  uiDataRefV1Schema,
+  type DiffViewPropsV1,
+  type HeatmapPropsV1,
+  type PivotTablePropsV1,
+} from 'rivu-ui-spec';
 
 import type { RivuComponentRegistration, RivuComponentRegistry, RivuHost } from '../registry.js';
 import { defaultRenderHooks } from '../render-hooks.js';
@@ -1438,6 +1446,301 @@ export const heatmapRegistrationV1: RivuComponentRegistration<HeatmapPropsV1> = 
   },
 };
 
+export const DIFF_VIEW_COMPONENT_TYPE = 'DiffView' as const;
+export const DIFF_VIEW_SCHEMA_VERSION = 1 as const;
+
+type DiffOp = { op: 'equal' | 'delete' | 'insert'; line: string };
+
+function normalizeDiffText(input: string): string {
+  return input.replace(/\r\n/g, '\n');
+}
+
+function applyDiffLimits(
+  input: string,
+  limits: DiffViewPropsV1['limits'] | undefined,
+): { text: string; truncated: boolean; truncatedByChars: boolean; truncatedByLines: boolean; originalChars: number; originalLines: number } {
+  const normalized = normalizeDiffText(input);
+  const originalChars = normalized.length;
+  const originalLines = normalized.split('\n').length;
+
+  let out = normalized;
+  let truncatedByChars = false;
+  let truncatedByLines = false;
+
+  if (typeof limits?.maxChars === 'number' && Number.isFinite(limits.maxChars) && limits.maxChars > 0 && out.length > limits.maxChars) {
+    out = out.slice(0, limits.maxChars);
+    truncatedByChars = true;
+  }
+
+  if (typeof limits?.maxLines === 'number' && Number.isFinite(limits.maxLines) && limits.maxLines > 0) {
+    const lines = out.split('\n');
+    if (lines.length > limits.maxLines) {
+      out = lines.slice(0, limits.maxLines).join('\n');
+      truncatedByLines = true;
+    }
+  }
+
+  return { text: out, truncated: truncatedByChars || truncatedByLines, truncatedByChars, truncatedByLines, originalChars, originalLines };
+}
+
+function myersDiffLines(beforeLines: string[], afterLines: string[]): DiffOp[] {
+  const n = beforeLines.length;
+  const m = afterLines.length;
+  const max = n + m;
+  const offset = max;
+
+  let v = new Int32Array(2 * max + 1);
+  const trace: Int32Array[] = [];
+
+  for (let d = 0; d <= max; d++) {
+    const vNext = v.slice();
+
+    for (let k = -d; k <= d; k += 2) {
+      const kIndex = k + offset;
+
+      const left = v[kIndex - 1] ?? 0;
+      const right = v[kIndex + 1] ?? 0;
+
+      let x: number;
+      if (k === -d) {
+        x = right;
+      } else if (k === d) {
+        x = left + 1;
+      } else if (left < right) {
+        x = right;
+      } else {
+        x = left + 1;
+      }
+
+      let y = x - k;
+      while (x < n && y < m && beforeLines[x] === afterLines[y]) {
+        x++;
+        y++;
+      }
+
+      vNext[kIndex] = x;
+
+      if (x >= n && y >= m) {
+        trace.push(vNext);
+        return backtrackMyers(trace, beforeLines, afterLines);
+      }
+    }
+
+    trace.push(vNext);
+    v = vNext;
+  }
+
+  return [];
+}
+
+function backtrackMyers(trace: Int32Array[], beforeLines: string[], afterLines: string[]): DiffOp[] {
+  const n = beforeLines.length;
+  const m = afterLines.length;
+  const max = n + m;
+  const offset = max;
+
+  let x = n;
+  let y = m;
+  const ops: DiffOp[] = [];
+
+  for (let d = trace.length - 1; d >= 0; d--) {
+    const v = trace[d]!;
+    const k = x - y;
+    const kIndex = k + offset;
+
+    let prevK: number;
+    if (k === -d) {
+      prevK = k + 1;
+    } else if (k === d) {
+      prevK = k - 1;
+    } else if ((v[kIndex - 1] ?? 0) < (v[kIndex + 1] ?? 0)) {
+      prevK = k + 1;
+    } else {
+      prevK = k - 1;
+    }
+
+    const prevV = trace[d - 1];
+    const prevX = prevV ? (prevV[prevK + offset] ?? 0) : 0;
+    const prevY = prevX - prevK;
+
+    while (x > prevX && y > prevY) {
+      ops.push({ op: 'equal', line: beforeLines[x - 1]! });
+      x--;
+      y--;
+    }
+
+    if (d === 0) break;
+
+    if (x === prevX) {
+      ops.push({ op: 'insert', line: afterLines[y - 1]! });
+      y--;
+    } else {
+      ops.push({ op: 'delete', line: beforeLines[x - 1]! });
+      x--;
+    }
+  }
+
+  return ops.reverse();
+}
+
+function toSplitRows(ops: DiffOp[]): Array<{ before: string | null; after: string | null; kind: 'equal' | 'delete' | 'insert' | 'change' }> {
+  const rows: Array<{ before: string | null; after: string | null; kind: 'equal' | 'delete' | 'insert' | 'change' }> = [];
+
+  let i = 0;
+  while (i < ops.length) {
+    const op = ops[i]!;
+    if (op.op === 'equal') {
+      rows.push({ before: op.line, after: op.line, kind: 'equal' });
+      i++;
+      continue;
+    }
+
+    const deletes: string[] = [];
+    const inserts: string[] = [];
+    while (i < ops.length && ops[i]!.op !== 'equal') {
+      const cur = ops[i]!;
+      if (cur.op === 'delete') deletes.push(cur.line);
+      if (cur.op === 'insert') inserts.push(cur.line);
+      i++;
+    }
+
+    const len = Math.max(deletes.length, inserts.length);
+    for (let j = 0; j < len; j++) {
+      const before = deletes[j] ?? null;
+      const after = inserts[j] ?? null;
+      const kind = before && after ? 'change' : before ? 'delete' : 'insert';
+      rows.push({ before, after, kind });
+    }
+  }
+
+  return rows;
+}
+
+export function DiffView(props: DiffViewPropsV1 & { host?: RivuHost; componentId?: string; className?: string; style?: CSSProperties }) {
+  const mode = props.mode ?? 'unified';
+  const before = applyDiffLimits(props.before, props.limits);
+  const after = applyDiffLimits(props.after, props.limits);
+
+  let ops: DiffOp[] = [];
+  try {
+    ops = myersDiffLines(before.text.split('\n'), after.text.split('\n'));
+  } catch (err) {
+    return (
+      <UnknownComponentCard
+        title="DiffView failed to render"
+        componentId={props.componentId ?? 'unknown'}
+        componentType={DIFF_VIEW_COMPONENT_TYPE}
+        schemaVersion={DIFF_VIEW_SCHEMA_VERSION}
+        details={{
+          error: err instanceof Error ? err.message : String(err),
+          hint: 'Consider setting props.limits.maxChars/maxLines for large payloads.',
+        }}
+      />
+    );
+  }
+
+  const truncated = before.truncated || after.truncated;
+  const truncationText = (() => {
+    if (!truncated) return null;
+    const parts: string[] = [];
+    if (before.truncated) parts.push('before');
+    if (after.truncated) parts.push('after');
+    const limits = props.limits ? JSON.stringify(props.limits) : '';
+    return `Truncated (${parts.join(', ')})${limits ? ` by limits ${limits}` : ''}`;
+  })();
+
+  return (
+    <div
+      className={props.className}
+      style={{
+        border: `1px solid ${theme.border}`,
+        borderRadius: theme.radius,
+        overflow: 'hidden',
+        background: theme.bg,
+        boxShadow: theme.shadow,
+        ...props.style,
+      }}
+    >
+      {props.title ? (
+        <div style={{ padding: `10px var(--rivu-space-3, 12px)`, fontSize: 'var(--rivu-font-size-base, 14px)', fontWeight: 750, color: theme.fg, borderBottom: `1px solid ${theme.borderMuted}` }}>
+          {props.title}
+        </div>
+      ) : null}
+
+      {truncationText ? (
+        <div style={{ padding: `8px var(--rivu-space-3, 12px)`, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fgMuted, borderBottom: `1px solid ${theme.borderMuted}`, background: theme.bgMuted }}>
+          {truncationText}
+        </div>
+      ) : null}
+
+      {mode === 'split' ? (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fg }}>
+            {props.beforeLabel || props.afterLabel ? (
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: `10px var(--rivu-space-3, 12px)`, background: theme.bgMuted, borderBottom: `1px solid ${theme.border}`, color: theme.fgMuted, fontWeight: 650, width: '50%' }}>
+                    {props.beforeLabel ?? ''}
+                  </th>
+                  <th style={{ textAlign: 'left', padding: `10px var(--rivu-space-3, 12px)`, background: theme.bgMuted, borderBottom: `1px solid ${theme.border}`, color: theme.fgMuted, fontWeight: 650, width: '50%' }}>
+                    {props.afterLabel ?? ''}
+                  </th>
+                </tr>
+              </thead>
+            ) : null}
+            <tbody style={{ fontFamily: 'var(--rivu-font-family, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial)' }}>
+              {toSplitRows(ops).map((row, idx) => {
+                const beforeBg = row.kind === 'delete' || row.kind === 'change' ? 'var(--rivu-negative-bg, #fef2f2)' : 'transparent';
+                const afterBg = row.kind === 'insert' || row.kind === 'change' ? 'var(--rivu-positive-bg, #ecfdf5)' : 'transparent';
+                return (
+                  <tr key={idx}>
+                    <td style={{ padding: `6px var(--rivu-space-3, 12px)`, borderBottom: `1px solid ${theme.borderMuted}`, background: beforeBg, verticalAlign: 'top' }}>
+                      <code style={{ whiteSpace: 'pre', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}>
+                        {row.before ?? ''}
+                      </code>
+                    </td>
+                    <td style={{ padding: `6px var(--rivu-space-3, 12px)`, borderBottom: `1px solid ${theme.borderMuted}`, background: afterBg, verticalAlign: 'top' }}>
+                      <code style={{ whiteSpace: 'pre', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }}>
+                        {row.after ?? ''}
+                      </code>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: 'var(--rivu-font-size-sm, 12px)' }}>
+            {ops.map((op, idx) => {
+              const bg =
+                op.op === 'insert'
+                  ? 'var(--rivu-positive-bg, #ecfdf5)'
+                  : op.op === 'delete'
+                    ? 'var(--rivu-negative-bg, #fef2f2)'
+                    : 'transparent';
+              const prefix = op.op === 'insert' ? '+' : op.op === 'delete' ? '-' : ' ';
+              return (
+                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '24px 1fr', gap: 8, padding: `2px var(--rivu-space-3, 12px)`, background: bg }}>
+                  <code style={{ color: theme.muted, whiteSpace: 'pre' }}>{prefix}</code>
+                  <code style={{ whiteSpace: 'pre' }}>{op.line}</code>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export const diffViewRegistrationV1: RivuComponentRegistration<DiffViewPropsV1> = {
+  schemaVersion: DIFF_VIEW_SCHEMA_VERSION,
+  propsSchema: diffViewPropsV1Schema,
+  render: ({ host, componentId, props }) => <DiffView host={host} componentId={componentId} {...props} />,
+};
+
 export const BAR_CHART_COMPONENT_TYPE = 'BarChart' as const;
 export const BAR_CHART_SCHEMA_VERSION = 1 as const;
 export const barChartPropsV1Schema = z
@@ -1703,6 +2006,7 @@ export const viewerRegistryV1 = {
   [DATA_TABLE_COMPONENT_TYPE]: dataTableRegistrationV1,
   [PIVOT_TABLE_COMPONENT_TYPE]: pivotTableRegistrationV1,
   [HEATMAP_COMPONENT_TYPE]: heatmapRegistrationV1,
+  [DIFF_VIEW_COMPONENT_TYPE]: diffViewRegistrationV1,
   [CHART_COMPONENT_TYPE]: chartRegistrationV1,
   [BAR_CHART_COMPONENT_TYPE]: barChartRegistrationV1,
   [LINE_CHART_COMPONENT_TYPE]: lineChartRegistrationV1,

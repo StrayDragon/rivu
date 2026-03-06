@@ -753,6 +753,87 @@ pub fn parse_heatmap_props_v1(bytes: &[u8], limits: DecodeLimits) -> Result<Heat
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DiffViewModeV1 {
+    Unified,
+    Split,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DiffViewLimitsV1 {
+    #[serde(default)]
+    pub max_chars: Option<i64>,
+    #[serde(default)]
+    pub max_lines: Option<i64>,
+}
+
+impl DiffViewLimitsV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if let Some(max_chars) = self.max_chars {
+            if max_chars < 1 {
+                return Err(UiSpecError::ValidationError("limits.maxChars must be >= 1".into()));
+            }
+        }
+        if let Some(max_lines) = self.max_lines {
+            if max_lines < 1 {
+                return Err(UiSpecError::ValidationError("limits.maxLines must be >= 1".into()));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DiffViewPropsV1 {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub before_label: Option<String>,
+    #[serde(default)]
+    pub after_label: Option<String>,
+    pub before: String,
+    pub after: String,
+    #[serde(default)]
+    pub mode: Option<DiffViewModeV1>,
+    #[serde(default)]
+    pub limits: Option<DiffViewLimitsV1>,
+}
+
+impl DiffViewPropsV1 {
+    pub fn validate(&self) -> Result<(), UiSpecError> {
+        if let Some(title) = &self.title {
+            if title.trim().is_empty() {
+                return Err(UiSpecError::ValidationError("title must be non-empty".into()));
+            }
+        }
+        if let Some(before_label) = &self.before_label {
+            if before_label.trim().is_empty() {
+                return Err(UiSpecError::ValidationError("beforeLabel must be non-empty".into()));
+            }
+        }
+        if let Some(after_label) = &self.after_label {
+            if after_label.trim().is_empty() {
+                return Err(UiSpecError::ValidationError("afterLabel must be non-empty".into()));
+            }
+        }
+        if let Some(limits) = &self.limits {
+            limits.validate()?;
+        }
+        Ok(())
+    }
+}
+
+pub fn parse_diff_view_props_v1(bytes: &[u8], limits: DecodeLimits) -> Result<DiffViewPropsV1, UiSpecError> {
+    let value: Value = serde_json::from_slice(bytes)?;
+    check_limits(bytes, &value, limits)?;
+    let props: DiffViewPropsV1 = serde_json::from_value(value)?;
+    props.validate()?;
+    Ok(props)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct A2uiMountV1 {
     pub message_id: String,

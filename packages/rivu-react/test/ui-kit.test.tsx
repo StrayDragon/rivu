@@ -233,6 +233,82 @@ test('Heatmap rejects non-numeric values in encoding.value column', () => {
   expect(screen.getByText('Heatmap value must be numeric')).toBeTruthy();
 });
 
+test('DiffView renders split mode with labels', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_diff: {
+              type: 'DiffView',
+              schemaVersion: 1,
+              props: {
+                title: 'Before vs After',
+                beforeLabel: 'Before',
+                afterLabel: 'After',
+                before: 'a\nb\n',
+                after: 'a\nc\n',
+                mode: 'split',
+                limits: { maxChars: 200, maxLines: 50 },
+              },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} host={viewerHost} componentId="cmp_diff" />);
+
+  expect(screen.getByText('Before vs After')).toBeTruthy();
+  expect(screen.getByText('Before')).toBeTruthy();
+  expect(screen.getByText('After')).toBeTruthy();
+  expect(screen.getByText('b')).toBeTruthy();
+  expect(screen.getByText('c')).toBeTruthy();
+});
+
+test('DiffView truncates before/after when limits exceeded', () => {
+  const kernel = createKernel();
+  kernel.dispatch({
+    seq: 1,
+    event: {
+      type: 'STATE_SNAPSHOT',
+      snapshot: {
+        ui: {
+          v: 1,
+          components: {
+            cmp_diff_trunc: {
+              type: 'DiffView',
+              schemaVersion: 1,
+              props: {
+                before: 'l1\nl2\nl3\n',
+                after: 'l1\nl2\nl4\n',
+                limits: { maxLines: 2 },
+              },
+              revision: 0,
+              mounts: [],
+            },
+          },
+        },
+      },
+    },
+  });
+
+  render(<ComponentRenderer kernel={kernel} host={viewerHost} componentId="cmp_diff_trunc" />);
+
+  expect(screen.getByText(/Truncated/)).toBeTruthy();
+  expect(screen.getByText('l1')).toBeTruthy();
+  expect(screen.getByText('l2')).toBeTruthy();
+  expect(screen.queryByText('l3')).toBeNull();
+  expect(screen.queryByText('l4')).toBeNull();
+});
+
 test('Chart emits ui.v1.event chart.setSelection with baseRevision', async () => {
   const actions: any[] = [];
   const kernel = createKernel({

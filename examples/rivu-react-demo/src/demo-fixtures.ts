@@ -162,6 +162,21 @@ export function createInitialSharedState() {
           revision: 0,
           mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 8 }],
         },
+        cmp_diff_view: {
+          type: 'DiffView',
+          schemaVersion: 1,
+          props: {
+            title: 'DiffView (before vs after)',
+            beforeLabel: 'Before',
+            afterLabel: 'After',
+            before: 'const x = 1;\nconsole.log(x);\n',
+            after: 'const x = 2;\nconsole.log(x);\n',
+            mode: 'split',
+            limits: { maxChars: 2000, maxLines: 50 },
+          },
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant1, slot: 'inline', order: 9 }],
+        },
         cmp_error_demo: {
           type: 'MetricCard',
           schemaVersion: 1,

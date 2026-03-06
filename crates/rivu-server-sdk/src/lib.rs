@@ -18,7 +18,7 @@ pub use ui_spec::{
     UiV1CapabilitiesComponentRangeV1, UiV1CapabilitiesCustomEvent, UiV1CapabilitiesExportFeaturesV1, UiV1CapabilitiesFeaturesV1,
     UiV1CapabilitiesValueV1, UiV1CustomEvent, UiV1EventValue, UI_V1_CAPABILITIES_NAME, UI_V1_EVENT_NAME,
     parse_heatmap_props_v1, parse_pivot_table_props_v1, HeatmapEncodingV1, HeatmapOptionsV1, HeatmapPropsV1, PivotTableAggV1,
-    PivotTableOptionsV1, PivotTablePropsV1,
+    PivotTableOptionsV1, PivotTablePropsV1, DiffViewLimitsV1, DiffViewModeV1, DiffViewPropsV1, parse_diff_view_props_v1,
 };
 
 pub use seq::{SeqAllocator, SeqError};

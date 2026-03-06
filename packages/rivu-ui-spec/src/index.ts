@@ -18,6 +18,9 @@ export { pivotTableAggV1Schema, pivotTableOptionsV1Schema, pivotTablePropsV1Sche
 export type { HeatmapEncodingV1, HeatmapOptionsV1, HeatmapPropsV1 } from './ui-heatmap.js';
 export { heatmapEncodingV1Schema, heatmapOptionsV1Schema, heatmapPropsV1Schema } from './ui-heatmap.js';
 
+export type { DiffViewLimitsV1, DiffViewModeV1, DiffViewPropsV1 } from './ui-diff-view.js';
+export { diffViewLimitsV1Schema, diffViewModeV1Schema, diffViewPropsV1Schema } from './ui-diff-view.js';
+
 export type {
   ChartInteractionEventNameV1,
   ChartSelectionKindV1,
@@ -89,6 +92,7 @@ export {
   chartPropsV1JsonSchema,
   pivotTablePropsV1JsonSchema,
   heatmapPropsV1JsonSchema,
+  diffViewPropsV1JsonSchema,
   uiInputLimitsV1JsonSchema,
   uiV1CustomEventJsonSchema,
   uiV1EventValueJsonSchema,

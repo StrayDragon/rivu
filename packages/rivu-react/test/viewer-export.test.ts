@@ -187,3 +187,43 @@ test('exportHtmlV1 renders Heatmap deterministically', () => {
   expect(html1).toContain('/api/a');
   expect(html1).toContain('0-50');
 });
+
+test('exportHtmlV1 renders DiffView deterministically', () => {
+  const snapshot = {
+    schema: 'rivu.export.v1',
+    sharedState: {
+      ui: {
+        v: 1,
+        components: {
+          cmp_diff: {
+            type: 'DiffView',
+            schemaVersion: 1,
+            props: {
+              title: 'Before vs After',
+              beforeLabel: 'Before',
+              afterLabel: 'After',
+              before: 'a\nb\nc\n',
+              after: 'a\nc\nd\n',
+              mode: 'split',
+              limits: { maxChars: 200, maxLines: 50 },
+            },
+            revision: 0,
+            mounts: [{ messageId: 'msg_1', slot: 'inline', order: 0 }],
+          },
+        },
+      },
+    },
+    messages: [{ id: 'msg_1', role: 'assistant', content: 'Hello export' }],
+    toolCalls: [],
+  };
+
+  const html1 = exportHtmlV1(snapshot as any);
+  const html2 = exportHtmlV1(snapshot as any);
+  expect(html1).toBe(html2);
+  expect(html1).toContain('Before vs After');
+  expect(html1).toContain('Before');
+  expect(html1).toContain('After');
+  expect(html1).toContain('a');
+  expect(html1).toContain('b');
+  expect(html1).toContain('d');
+});

@@ -10,6 +10,7 @@ import { a2uiV1Schema } from '../src/a2ui-v1.js';
 import { chartPropsV1Schema } from '../src/ui-chart.js';
 import { pivotTablePropsV1Schema } from '../src/ui-pivot-table.js';
 import { heatmapPropsV1Schema } from '../src/ui-heatmap.js';
+import { diffViewPropsV1Schema } from '../src/ui-diff-view.js';
 import { uiInputLimitsV1Schema } from '../src/limits.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,6 +33,7 @@ async function main() {
   const chartPropsV1JsonSchema = chartPropsV1Schema.toJSONSchema();
   const pivotTablePropsV1JsonSchema = pivotTablePropsV1Schema.toJSONSchema();
   const heatmapPropsV1JsonSchema = heatmapPropsV1Schema.toJSONSchema();
+  const diffViewPropsV1JsonSchema = diffViewPropsV1Schema.toJSONSchema();
   const uiInputLimitsV1JsonSchema = uiInputLimitsV1Schema.toJSONSchema();
 
   const outPath = path.join(__dirname, '..', 'src', 'json-schema.generated.ts');
@@ -58,6 +60,8 @@ async function main() {
     toConstExport('pivotTablePropsV1JsonSchema', pivotTablePropsV1JsonSchema),
     '\n',
     toConstExport('heatmapPropsV1JsonSchema', heatmapPropsV1JsonSchema),
+    '\n',
+    toConstExport('diffViewPropsV1JsonSchema', diffViewPropsV1JsonSchema),
     '\n',
     toConstExport('uiInputLimitsV1JsonSchema', uiInputLimitsV1JsonSchema),
     '',
