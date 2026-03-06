@@ -262,6 +262,39 @@ export function createInitialSharedState() {
           revision: 0,
           mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 1 }],
         },
+        cmp_wizard: {
+          type: 'MultiStepWizard',
+          schemaVersion: 1,
+          props: {
+            title: 'MultiStepWizard',
+            description: 'Workflow component. Next/prev/setField/submit are server-authoritative.',
+            submitLabel: 'Submit (demo)',
+            steps: [
+              {
+                id: 'profile',
+                title: 'Profile',
+                fields: [
+                  { id: 'email', label: 'Email', type: 'text', required: true, placeholder: 'name@company.com' },
+                  { id: 'age', label: 'Age', type: 'number' },
+                ],
+              },
+              {
+                id: 'plan',
+                title: 'Plan',
+                fields: [
+                  { id: 'plan', label: 'Plan', type: 'select', required: true, placeholder: 'Choose…', options: [
+                    { label: 'Starter', value: 'starter' },
+                    { label: 'Pro', value: 'pro' },
+                    { label: 'Enterprise', value: 'enterprise' }
+                  ] }
+                ],
+              },
+            ],
+          },
+          state: { currentStepId: 'profile', values: {}, status: 'idle' },
+          revision: 0,
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 2 }],
+        },
         cmp_chart_workflow: {
           type: 'Chart',
           schemaVersion: 1,
@@ -281,7 +314,7 @@ export function createInitialSharedState() {
           },
           state: { selection: { kind: 'none' } },
           revision: 0,
-          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 2 }],
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 3 }],
         },
         cmp_confirm: {
           type: 'ConfirmCard',
@@ -294,7 +327,7 @@ export function createInitialSharedState() {
           },
           state: { status: 'pending' },
           revision: 0,
-          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 3 }],
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 4 }],
         },
         cmp_task_status: {
           type: 'TaskStatusCard',
@@ -307,7 +340,7 @@ export function createInitialSharedState() {
             message: 'Queued (demo)…',
           },
           revision: 0,
-          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 4 }],
+          mounts: [{ messageId: DEMO_MESSAGE_IDS.assistant2, slot: 'inline', order: 5 }],
         },
       },
     },

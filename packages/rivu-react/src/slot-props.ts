@@ -64,6 +64,22 @@ export type RivuSlotProps = {
     actions?: RivuSlotPropOverrides;
     submitButton?: RivuSlotPropOverrides;
   };
+  MultiStepWizard?: {
+    root?: RivuSlotPropOverrides;
+    header?: RivuSlotPropOverrides;
+    title?: RivuSlotPropOverrides;
+    description?: RivuSlotPropOverrides;
+    stepper?: RivuSlotPropOverrides;
+    step?: RivuSlotPropOverrides;
+    fields?: RivuSlotPropOverrides;
+    field?: RivuSlotPropOverrides;
+    status?: RivuSlotPropOverrides;
+    actions?: RivuSlotPropOverrides;
+    prevButton?: RivuSlotPropOverrides;
+    nextButton?: RivuSlotPropOverrides;
+    submitButton?: RivuSlotPropOverrides;
+    resetButton?: RivuSlotPropOverrides;
+  };
 };
 
 function mergeClassName(base?: string, extra?: string): string | undefined {

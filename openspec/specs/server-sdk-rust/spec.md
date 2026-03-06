@@ -133,3 +133,15 @@ Rust SDK MUST 提供内置的 chart 交互处理器，用于将 `chart.setSelect
 - **WHEN** `rowIndex` 超出当前数据集 rows 范围
 - **THEN** SDK 拒绝该事件并返回可诊断错误（不得写入非法 selection）
 
+### Requirement: Rust SDK provides a built-in MultiStepWizard event processor
+
+The Rust SDK MUST provide a built-in `MultiStepWizard` processor that:
+- validates `eventName/payload` for `wizard.setField/next/prev/submit/reset`
+- enforces idempotency using `clientRequestId`
+- enforces optimistic concurrency using `baseRevision` vs component `revision`
+- outputs JSON Patch ops targeting `/ui/components/<componentId>/state` and `/ui/components/<componentId>/revision`
+
+#### Scenario: Processor outputs patch ops for next step
+- **WHEN** the SDK processes a valid `wizard.next` event with a matching `baseRevision`
+- **THEN** it outputs patch ops that update `state.currentStepId` (or an equivalent pointer) and increment `revision`
+

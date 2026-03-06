@@ -7,6 +7,7 @@ Start here (for most users):
 - `docs/integration.md` — adoption ladder + kernel/registry + lifecycle + component catalog
 - `docs/thread-ui-kit.md` — optional Layer 2: ThreadView + ToolCards (messages, tool cards, mounts, run status)
 - `docs/workflow-cards.md` — workflow primitives: `ConfirmCard` + `TaskStatusCard` (server-authoritative)
+- `docs/workflow-multi-step-wizard.md` — `MultiStepWizard@1` contract + server-authoritative processing guidance
 - `docs/agent-skills.md` — optional: agent skills bundle for integrators/maintainers
 
 For contributors (requirements + planned work):

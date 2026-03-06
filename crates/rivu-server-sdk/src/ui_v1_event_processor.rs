@@ -307,6 +307,121 @@ fn apply_component_event(component: &UiComponentV1, event: &UiV1CustomEvent) -> 
                 other
             ))),
         },
+        "MultiStepWizard" => match event.value.event_name.as_str() {
+            "wizard.setField" => {
+                if event.value.payload.len() != 2 || !event.value.payload.contains_key("fieldId") || !event.value.payload.contains_key("value") {
+                    return Err(UiV1EventProcessorError::InvalidPayload(
+                        "payload must have only fieldId and value".into(),
+                    ));
+                }
+
+                let field_id = event
+                    .value
+                    .payload
+                    .get("fieldId")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                if field_id.trim().is_empty() {
+                    return Err(UiV1EventProcessorError::InvalidPayload(
+                        "payload.fieldId must be a non-empty string".into(),
+                    ));
+                }
+
+                let value = event.value.payload.get("value").unwrap_or(&Value::Null);
+                if !(value.is_null() || value.is_string() || is_finite_number(value)) {
+                    return Err(UiV1EventProcessorError::InvalidPayload(
+                        "payload.value must be string|number|null".into(),
+                    ));
+                }
+
+                let mut values_obj: Map<String, Value> = match state.remove("values") {
+                    Some(Value::Object(map)) => map,
+                    _ => Map::new(),
+                };
+                values_obj.insert(field_id.clone(), value.clone());
+                state.insert("values".into(), Value::Object(values_obj));
+
+                let mut errors_obj: Map<String, Value> = match state.remove("errors") {
+                    Some(Value::Object(map)) => map,
+                    _ => Map::new(),
+                };
+                errors_obj.remove(&field_id);
+                state.insert("errors".into(), Value::Object(errors_obj));
+
+                Ok((Value::Object(state), component.revision + 1))
+            }
+            "wizard.next" | "wizard.prev" | "wizard.submit" | "wizard.reset" => {
+                if !event.value.payload.is_empty() {
+                    return Err(UiV1EventProcessorError::InvalidPayload("payload must be empty".into()));
+                }
+
+                if event.value.event_name == "wizard.submit" {
+                    state.insert("status".into(), Value::String("submitted".into()));
+                    return Ok((Value::Object(state), component.revision + 1));
+                }
+
+                let steps = component
+                    .props
+                    .get("steps")
+                    .and_then(Value::as_array)
+                    .ok_or_else(|| UiV1EventProcessorError::InvalidPayload("MultiStepWizard props.steps must be an array".into()))?;
+                if steps.is_empty() {
+                    return Err(UiV1EventProcessorError::InvalidPayload(
+                        "MultiStepWizard props.steps must be a non-empty array".into(),
+                    ));
+                }
+
+                let mut step_ids: Vec<String> = Vec::with_capacity(steps.len());
+                for step in steps {
+                    let step_id = step
+                        .as_object()
+                        .and_then(|o| o.get("id"))
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    if step_id.trim().is_empty() {
+                        return Err(UiV1EventProcessorError::InvalidPayload(
+                            "MultiStepWizard step.id must be a non-empty string".into(),
+                        ));
+                    }
+                    step_ids.push(step_id);
+                }
+
+                let current_step_id = state.get("currentStepId").and_then(Value::as_str).unwrap_or("").trim();
+                let mut idx = step_ids.iter().position(|id| id == current_step_id).unwrap_or(0);
+
+                match event.value.event_name.as_str() {
+                    "wizard.next" => {
+                        if idx + 1 < step_ids.len() {
+                            idx += 1;
+                            state.insert("currentStepId".into(), Value::String(step_ids[idx].clone()));
+                        }
+                        Ok((Value::Object(state), component.revision + 1))
+                    }
+                    "wizard.prev" => {
+                        if idx > 0 {
+                            idx -= 1;
+                            state.insert("currentStepId".into(), Value::String(step_ids[idx].clone()));
+                        }
+                        Ok((Value::Object(state), component.revision + 1))
+                    }
+                    "wizard.reset" => {
+                        state.insert("currentStepId".into(), Value::String(step_ids[0].clone()));
+                        state.insert("values".into(), Value::Object(Map::new()));
+                        state.remove("errors");
+                        state.remove("disabled");
+                        state.insert("status".into(), Value::String("idle".into()));
+                        Ok((Value::Object(state), component.revision + 1))
+                    }
+                    _ => unreachable!("only wizard.next/prev/submit/reset handled above"),
+                }
+            }
+            other => Err(UiV1EventProcessorError::InvalidPayload(format!(
+                "unsupported MultiStepWizard eventName: {}",
+                other
+            ))),
+        },
         "FormCard" => match event.value.event_name.as_str() {
             "setField" => {
                 let field_id = event

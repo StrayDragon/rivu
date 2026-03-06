@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "multiStepWizardPropsV1": {
+    "valid": [
+      {
+        "id": "basic_two_step",
+        "props": {
+          "title": "Account setup",
+          "description": "Collect details step by step",
+          "submitLabel": "Submit",
+          "steps": [
+            {
+              "id": "profile",
+              "title": "Profile",
+              "description": "Basic info",
+              "fields": [
+                { "id": "email", "label": "Email", "type": "text", "required": true, "placeholder": "name@company.com" },
+                { "id": "age", "label": "Age", "type": "number" }
+              ]
+            },
+            {
+              "id": "plan",
+              "title": "Plan",
+              "fields": [
+                {
+                  "id": "plan",
+                  "label": "Plan",
+                  "type": "select",
+                  "required": true,
+                  "options": [
+                    { "label": "Starter", "value": "starter" },
+                    { "label": "Pro", "value": "pro" }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "single_step_textarea",
+        "props": {
+          "title": "Refund request",
+          "steps": [
+            {
+              "id": "details",
+              "title": "Details",
+              "fields": [
+                { "id": "reason", "label": "Reason", "type": "textarea", "placeholder": "Explain…" }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "id": "empty_title_not_allowed",
+        "props": { "title": "", "steps": [{ "id": "s1", "title": "Step", "fields": [{ "id": "f1", "label": "F", "type": "text" }] }] }
+      },
+      {
+        "id": "steps_min_1",
+        "props": { "title": "Wizard", "steps": [] }
+      },
+      {
+        "id": "step_fields_min_1",
+        "props": { "title": "Wizard", "steps": [{ "id": "s1", "title": "Step", "fields": [] }] }
+      },
+      {
+        "id": "select_requires_options",
+        "props": {
+          "title": "Wizard",
+          "steps": [
+            { "id": "s1", "title": "Step", "fields": [{ "id": "plan", "label": "Plan", "type": "select" }] }
+          ]
+        }
+      }
+    ]
+  },
+  "multiStepWizardStateV1": {
+    "valid": [
+      {
+        "id": "initial_idle",
+        "state": { "currentStepId": "profile", "values": {}, "status": "idle" }
+      },
+      {
+        "id": "with_values_errors_and_disabled",
+        "state": {
+          "currentStepId": "plan",
+          "values": { "email": "a@example.com", "age": 30, "plan": null },
+          "errors": { "plan": "required" },
+          "disabled": true,
+          "status": "error"
+        }
+      }
+    ],
+    "invalid": [
+      {
+        "id": "missing_current_step",
+        "state": { "values": {} }
+      },
+      {
+        "id": "empty_current_step_not_allowed",
+        "state": { "currentStepId": "", "values": {} }
+      },
+      {
+        "id": "invalid_value_type_boolean",
+        "state": { "currentStepId": "s1", "values": { "ok": true } }
+      },
+      {
+        "id": "invalid_status",
+        "state": { "currentStepId": "s1", "values": {}, "status": "done" }
+      }
+    ]
+  },
+  "wizardEventPayloadV1": {
+    "valid": [
+      { "id": "set_field_string", "event": { "eventName": "wizard.setField", "payload": { "fieldId": "email", "value": "a@example.com" } } },
+      { "id": "set_field_number", "event": { "eventName": "wizard.setField", "payload": { "fieldId": "age", "value": 30 } } },
+      { "id": "set_field_null", "event": { "eventName": "wizard.setField", "payload": { "fieldId": "notes", "value": null } } },
+      { "id": "next_empty_payload", "event": { "eventName": "wizard.next", "payload": {} } },
+      { "id": "prev_empty_payload", "event": { "eventName": "wizard.prev", "payload": {} } },
+      { "id": "submit_empty_payload", "event": { "eventName": "wizard.submit", "payload": {} } },
+      { "id": "reset_empty_payload", "event": { "eventName": "wizard.reset", "payload": {} } }
+    ],
+    "invalid": [
+      { "id": "set_field_missing_field_id", "event": { "eventName": "wizard.setField", "payload": { "value": "x" } } },
+      { "id": "set_field_empty_field_id", "event": { "eventName": "wizard.setField", "payload": { "fieldId": "", "value": "x" } } },
+      { "id": "set_field_invalid_value_type", "event": { "eventName": "wizard.setField", "payload": { "fieldId": "ok", "value": true } } },
+      { "id": "set_field_extra_key_not_allowed", "event": { "eventName": "wizard.setField", "payload": { "fieldId": "email", "value": "x", "extra": 1 } } },
+      { "id": "next_payload_must_be_empty", "event": { "eventName": "wizard.next", "payload": { "x": 1 } } },
+      { "id": "unknown_event_name", "event": { "eventName": "wizard.jump", "payload": {} } }
+    ]
+  }
+}
+

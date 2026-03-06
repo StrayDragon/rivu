@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Rust SDK provides a built-in MultiStepWizard event processor
 

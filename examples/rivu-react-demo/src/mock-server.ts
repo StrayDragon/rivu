@@ -277,6 +277,67 @@ export function createMockServer(params: {
       } else {
         throw new Error(`unsupported FormCard eventName: ${value.eventName}`);
       }
+    } else if (componentType === 'MultiStepWizard') {
+      const steps = (component.props as any).steps as unknown;
+      if (!Array.isArray(steps) || steps.length === 0) throw new Error('MultiStepWizard props.steps must be a non-empty array');
+
+      const stepIds = steps.map((step, idx) => {
+        assertRecord(step, `MultiStepWizard props.steps[${idx}] must be an object`);
+        const stepId = (step as any).id as unknown;
+        if (typeof stepId !== 'string' || !stepId.trim()) throw new Error('MultiStepWizard step.id must be a non-empty string');
+        return stepId;
+      });
+
+      const currentStepId =
+        typeof (state as any).currentStepId === 'string' && (state as any).currentStepId.trim()
+          ? String((state as any).currentStepId)
+          : stepIds[0]!;
+
+      if (value.eventName === 'wizard.setField') {
+        assertRecord(value.payload, 'payload must be an object');
+        const payload = value.payload as any;
+        const keys = Object.keys(payload);
+        if (keys.length !== 2 || !('fieldId' in payload) || !('value' in payload)) {
+          throw new Error('payload must have only fieldId and value');
+        }
+
+        const fieldId = payload.fieldId as unknown;
+        if (typeof fieldId !== 'string' || !fieldId.trim()) throw new Error('payload.fieldId must be a non-empty string');
+
+        const v = payload.value as unknown;
+        if (!(v === null || typeof v === 'string' || isFiniteNumber(v))) {
+          throw new Error('payload.value must be string|number|null');
+        }
+
+        const valuesState = { ...((state.values as any) ?? {}) } as Record<string, unknown>;
+        valuesState[fieldId] = v;
+        state.values = valuesState;
+
+        const errorsState = { ...((state.errors as any) ?? {}) } as Record<string, unknown>;
+        delete errorsState[fieldId];
+        state.errors = errorsState;
+      } else if (value.eventName === 'wizard.next' || value.eventName === 'wizard.prev' || value.eventName === 'wizard.submit' || value.eventName === 'wizard.reset') {
+        assertRecord(value.payload, 'payload must be an object');
+        if (Object.keys(value.payload).length !== 0) throw new Error('payload must be empty');
+
+        if (value.eventName === 'wizard.next') {
+          const idx = stepIds.indexOf(currentStepId);
+          if (idx >= 0 && idx + 1 < stepIds.length) (state as any).currentStepId = stepIds[idx + 1];
+        } else if (value.eventName === 'wizard.prev') {
+          const idx = stepIds.indexOf(currentStepId);
+          if (idx > 0) (state as any).currentStepId = stepIds[idx - 1];
+        } else if (value.eventName === 'wizard.submit') {
+          state.status = 'submitted';
+        } else if (value.eventName === 'wizard.reset') {
+          (state as any).currentStepId = stepIds[0];
+          state.values = {};
+          delete (state as any).errors;
+          delete (state as any).disabled;
+          state.status = 'idle';
+        }
+      } else {
+        throw new Error(`unsupported MultiStepWizard eventName: ${value.eventName}`);
+      }
     } else {
       throw new Error(`unsupported component type: ${componentType}`);
     }

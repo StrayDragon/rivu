@@ -3,7 +3,14 @@ import type { CSSProperties, ReactNode } from 'react';
 import { z } from 'zod';
 
 import type { RivuKernel } from 'rivu-kernel';
-import { UI_V1_EVENT_NAME, type UiV1CustomEvent } from 'rivu-ui-spec';
+import {
+  UI_V1_EVENT_NAME,
+  multiStepWizardPropsV1Schema,
+  multiStepWizardStateV1Schema,
+  type MultiStepWizardPropsV1,
+  type MultiStepWizardStateV1,
+  type UiV1CustomEvent,
+} from 'rivu-ui-spec';
 
 import { createClientRequestId } from '../client-request-id.js';
 import type { RivuComponentRegistration, RivuComponentRegistry, RivuHost } from '../registry.js';
@@ -936,9 +943,467 @@ export const formCardRegistrationV1: RivuComponentRegistration<FormCardPropsV1, 
   ),
 };
 
+export const MULTI_STEP_WIZARD_COMPONENT_TYPE = 'MultiStepWizard' as const;
+export const MULTI_STEP_WIZARD_SCHEMA_VERSION = 1 as const;
+
+type WizardEventNameV1 = 'wizard.setField' | 'wizard.next' | 'wizard.prev' | 'wizard.submit' | 'wizard.reset';
+
+export type MultiStepWizardSlots = {
+  Header?: (args: { title: string; description?: string; stepIndex: number; stepCount: number }) => ReactNode;
+  Stepper?: (args: { steps: MultiStepWizardPropsV1['steps']; currentStepId: string }) => ReactNode;
+  Field?: (args: {
+    field: MultiStepWizardPropsV1['steps'][number]['fields'][number];
+    value: string | number | null;
+    error: string | null;
+    disabled: boolean;
+    inputId: string;
+    onChange: (raw: string) => void;
+  }) => ReactNode;
+  Status?: (args: { status?: MultiStepWizardStateV1['status']; localError: string | null }) => ReactNode;
+  Actions?: (args: {
+    disabled: boolean;
+    sending: WizardEventNameV1 | null;
+    isFirst: boolean;
+    isLast: boolean;
+    submitLabel: string;
+    onPrev: () => void;
+    onNext: () => void;
+    onSubmit: () => void;
+    onReset: () => void;
+  }) => ReactNode;
+};
+
+export function MultiStepWizard(
+  props: MultiStepWizardPropsV1 & {
+    host?: RivuHost;
+    kernel: RivuKernel;
+    componentId: string;
+    revision: number;
+    state: MultiStepWizardStateV1 | undefined;
+    className?: string;
+    style?: CSSProperties;
+    slots?: MultiStepWizardSlots;
+  },
+) {
+  const hooks = props.host?.renderHooks ?? defaultRenderHooks;
+  const slotProps = props.host?.slotProps?.MultiStepWizard;
+  const meta = { componentId: props.componentId, componentType: MULTI_STEP_WIZARD_COMPONENT_TYPE };
+
+  const disabled = props.state?.disabled === true || props.state?.status === 'submitting';
+  const serverValues = props.state?.values ?? {};
+
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [sending, setSending] = useState<WizardEventNameV1 | null>(null);
+  const [values, setValues] = useState<Record<string, string | number | null>>(() => ({ ...serverValues }));
+
+  useEffect(() => {
+    setValues({ ...serverValues });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.revision]);
+
+  const errors = props.state?.errors ?? {};
+
+  const sendUiEvent = async (eventName: WizardEventNameV1, payload: Record<string, unknown>) => {
+    const action: UiV1CustomEvent = {
+      type: 'CUSTOM',
+      name: UI_V1_EVENT_NAME,
+      value: {
+        componentId: props.componentId,
+        eventName,
+        payload,
+        clientRequestId: createClientRequestId(),
+        baseRevision: props.revision,
+      },
+    };
+    await props.kernel.send(action);
+  };
+
+  const currentStepId = props.state?.currentStepId ?? props.steps[0]?.id ?? '';
+  const stepIndex = Math.max(0, props.steps.findIndex((s) => s.id === currentStepId));
+  const stepCount = props.steps.length;
+  const currentStep = props.steps[stepIndex] ?? props.steps[0]!;
+
+  const isFirst = stepIndex === 0;
+  const isLast = stepIndex === stepCount - 1;
+
+  const fieldById = useMemo(
+    () => new Map(props.steps.flatMap((step) => step.fields).map((field) => [field.id, field])),
+    [props.steps],
+  );
+
+  const onSetField = async (fieldId: string, raw: string) => {
+    if (disabled) return;
+    const field = fieldById.get(fieldId);
+    if (!field) return;
+    const value = normalizeValue(raw, field.type);
+    setValues((prev) => ({ ...prev, [fieldId]: value }));
+    setLocalError(null);
+    try {
+      await sendUiEvent('wizard.setField', { fieldId, value });
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const onAction = async (eventName: Exclude<WizardEventNameV1, 'wizard.setField'>) => {
+    if (disabled) return;
+    if (sending) return;
+    setLocalError(null);
+    setSending(eventName);
+    try {
+      await sendUiEvent(eventName, {});
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSending(null);
+    }
+  };
+
+  const submitLabel = props.submitLabel ?? (props.state?.status === 'submitting' ? 'Submitting…' : 'Submit');
+
+  const status = typeof props.state?.status === 'string' ? props.state.status : undefined;
+  const statusNode = props.slots?.Status
+    ? props.slots.Status({ localError, ...(status ? { status } : {}) })
+    : status || localError
+      ? (
+          <div
+            {...(() => {
+              const statusSlot = applySlotProps({ style: { marginTop: 10, display: 'flex', alignItems: 'center', gap: 10 } }, slotProps?.status);
+              const { className, style, ...attrs } = statusSlot;
+              return { className, style, ...attrs };
+            })()}
+          >
+            {status ? (
+              <div style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', color: 'var(--rivu-fg-muted, #374151)' }}>
+                status:{' '}
+                <span style={{ fontWeight: 650, color: status === 'submitted' ? theme.chart2 : status === 'error' ? theme.chart4 : 'var(--rivu-fg-muted, #374151)' }}>
+                  {status}
+                </span>
+              </div>
+            ) : null}
+            {localError ? <div style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.chart4 }}>{localError}</div> : null}
+          </div>
+        )
+      : null;
+
+  const rootSlot = applySlotProps(
+    {
+      className: props.className,
+      style: {
+        border: `1px solid ${theme.border}`,
+        borderRadius: theme.radius,
+        padding: 'var(--rivu-space-4, 14px)',
+        background: theme.bg,
+        boxShadow: theme.shadow,
+        ...props.style,
+      },
+    },
+    slotProps?.root,
+  );
+  const { className: rootClassName, style: rootStyle, ...rootAttrs } = rootSlot;
+
+  const commonInputStyle: CSSProperties = {
+    width: '100%',
+    borderRadius: theme.radiusSm,
+    border: `1px solid ${theme.border}`,
+    padding: 'var(--rivu-space-2, 8px) 10px',
+    fontSize: 'var(--rivu-font-size-sm, 12px)',
+    outline: 'none',
+    background: theme.bg,
+    color: theme.fg,
+  };
+
+  return (
+    <div
+      className={rootClassName}
+      style={rootStyle}
+      {...(rootAttrs as any)}
+    >
+      <div
+        {...(() => {
+          const headerSlot = applySlotProps({}, slotProps?.header);
+          const { className, style, ...attrs } = headerSlot;
+          return { className, style, ...attrs };
+	        })()}
+	      >
+	        {props.slots?.Header ? (
+	          props.slots.Header({
+	            title: props.title,
+	            ...(props.description === undefined ? {} : { description: props.description }),
+	            stepIndex,
+	            stepCount,
+	          })
+	        ) : (
+	          <>
+            <div
+              {...(() => {
+                const titleSlot = applySlotProps({ style: { fontWeight: 650, fontSize: 'var(--rivu-font-size-base, 14px)', color: theme.fg } }, slotProps?.title);
+                const { className, style, ...attrs } = titleSlot;
+                return { className, style, ...attrs };
+              })()}
+            >
+              {props.title}
+            </div>
+            {props.description ? (
+              <div
+                {...(() => {
+                  const descSlot = applySlotProps({ style: { marginTop: 6, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fgMuted } }, slotProps?.description);
+                  const { className, style, ...attrs } = descSlot;
+                  return { className, style, ...attrs };
+                })()}
+              >
+                {hooks.renderMarkdown(props.description, { ...meta, path: 'description' })}
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+
+      {props.slots?.Stepper ? (
+        <div style={{ marginTop: 'var(--rivu-space-3, 12px)' }}>{props.slots.Stepper({ steps: props.steps, currentStepId })}</div>
+      ) : (
+        <div
+          {...(() => {
+            const stepperSlot = applySlotProps(
+              { style: { marginTop: 'var(--rivu-space-3, 12px)', display: 'flex', flexWrap: 'wrap', gap: 8 } },
+              slotProps?.stepper,
+            );
+            const { className, style, ...attrs } = stepperSlot;
+            return { className, style, ...attrs };
+          })()}
+        >
+          {props.steps.map((step, idx) => {
+            const active = step.id === currentStepId;
+            const stepSlot = applySlotProps(
+              {
+                style: {
+                  padding: '6px 10px',
+                  borderRadius: theme.radiusSm,
+                  border: `1px solid ${active ? theme.chart1 : theme.border}`,
+                  background: theme.bgSubtle,
+                  color: active ? theme.fg : theme.fgMuted,
+                  fontSize: 'var(--rivu-font-size-sm, 12px)',
+                  fontWeight: active ? 700 : 600,
+                },
+              },
+              slotProps?.step,
+            );
+            const { className, style, ...attrs } = stepSlot;
+            return (
+              <div
+                key={step.id}
+                className={className}
+                style={style}
+                {...(attrs as any)}
+              >
+                {idx + 1}. {step.title}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div style={{ marginTop: 'var(--rivu-space-4, 14px)' }}>
+        <div style={{ fontWeight: 650, fontSize: 'var(--rivu-font-size-base, 14px)', color: theme.fg }}>{currentStep.title}</div>
+        {currentStep.description ? (
+          <div style={{ marginTop: 6, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.fgMuted }}>
+            {hooks.renderMarkdown(currentStep.description, { ...meta, path: `steps.${stepIndex}.description` })}
+          </div>
+        ) : null}
+
+        <div
+          {...(() => {
+            const fieldsSlot = applySlotProps(
+              { style: { marginTop: 'var(--rivu-space-3, 12px)', display: 'flex', flexDirection: 'column', gap: 12 } },
+              slotProps?.fields,
+            );
+            const { className, style, ...attrs } = fieldsSlot;
+            return { className, style, ...attrs };
+          })()}
+	        >
+	          {currentStep.fields.map((field) => {
+	            const value = values[field.id] ?? null;
+	            const maybeError = (errors as Record<string, string>)[field.id];
+	            const error = typeof maybeError === 'string' ? maybeError : null;
+	            const labelText = `${field.label}${field.required ? ' *' : ''}`;
+	            const inputId = `rivu_wizard_${domId(props.componentId)}_${domId(field.id)}`;
+
+            if (props.slots?.Field) {
+              return (
+                <div key={field.id}>
+                  {props.slots.Field({
+                    field,
+                    value,
+                    error,
+                    disabled,
+                    inputId,
+                    onChange: (raw) => void onSetField(field.id, raw),
+                  })}
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={field.id}
+                {...(() => {
+                  const fieldSlot = applySlotProps({}, slotProps?.field);
+                  const { className, style, ...attrs } = fieldSlot;
+                  return { className, style, ...attrs };
+                })()}
+              >
+                <label
+                  htmlFor={inputId}
+                  style={{ fontSize: 'var(--rivu-font-size-sm, 12px)', fontWeight: 600, color: theme.fg, display: 'block' }}
+                >
+                  {labelText}
+                </label>
+                <div style={{ marginTop: 6 }}>
+                  {field.type === 'textarea' ? (
+                    <textarea
+                      id={inputId}
+                      value={typeof value === 'string' ? value : value == null ? '' : String(value)}
+                      placeholder={field.placeholder}
+                      disabled={disabled}
+                      onChange={(e) => void onSetField(field.id, e.target.value)}
+                      rows={3}
+                      style={commonInputStyle}
+                    />
+                  ) : field.type === 'select' ? (
+                    <select
+                      id={inputId}
+                      value={typeof value === 'string' ? value : value == null ? '' : String(value)}
+                      disabled={disabled}
+                      onChange={(e) => void onSetField(field.id, e.target.value)}
+                      style={commonInputStyle}
+                    >
+                      <option value="" disabled={field.required}>
+                        {field.placeholder ?? 'Select…'}
+                      </option>
+                      {(field.options ?? []).map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      id={inputId}
+                      type={field.type === 'number' ? 'number' : 'text'}
+                      value={typeof value === 'string' ? value : value == null ? '' : String(value)}
+                      placeholder={field.placeholder}
+                      disabled={disabled}
+                      onChange={(e) => void onSetField(field.id, e.target.value)}
+                      style={commonInputStyle}
+                    />
+                  )}
+                </div>
+                {error ? <div style={{ marginTop: 6, fontSize: 'var(--rivu-font-size-sm, 12px)', color: theme.chart4 }}>{error}</div> : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {statusNode}
+
+      <div
+        {...(() => {
+          const actionsSlot = applySlotProps(
+            { style: { marginTop: 'var(--rivu-space-4, 14px)', display: 'flex', flexWrap: 'wrap', gap: 10 } },
+            slotProps?.actions,
+          );
+          const { className, style, ...attrs } = actionsSlot;
+          return { className, style, ...attrs };
+        })()}
+      >
+        {props.slots?.Actions ? (
+          props.slots.Actions({
+            disabled,
+            sending,
+            isFirst,
+            isLast,
+            submitLabel,
+            onPrev: () => void onAction('wizard.prev'),
+            onNext: () => void onAction('wizard.next'),
+            onSubmit: () => void onAction('wizard.submit'),
+            onReset: () => void onAction('wizard.reset'),
+          })
+        ) : (
+          <>
+            <button
+              type="button"
+              {...(() => {
+                const prevSlot = applySlotProps({ style: { ...buttonStyle('default'), opacity: disabled || isFirst || !!sending ? 0.7 : 1 } }, slotProps?.prevButton);
+                const { className, style, ...attrs } = prevSlot;
+                return { className, style, ...attrs };
+              })()}
+              disabled={disabled || isFirst || !!sending}
+              onClick={() => void onAction('wizard.prev')}
+            >
+              Back
+            </button>
+
+            {!isLast ? (
+              <button
+                type="button"
+                {...(() => {
+                  const nextSlot = applySlotProps({ style: { ...buttonStyle('primary'), opacity: disabled || !!sending ? 0.7 : 1 } }, slotProps?.nextButton);
+                  const { className, style, ...attrs } = nextSlot;
+                  return { className, style, ...attrs };
+                })()}
+                disabled={disabled || !!sending}
+                onClick={() => void onAction('wizard.next')}
+              >
+                Next
+              </button>
+            ) : (
+              <button
+                type="button"
+                {...(() => {
+                  const submitSlot = applySlotProps({ style: { ...buttonStyle('primary'), opacity: disabled || !!sending ? 0.7 : 1 } }, slotProps?.submitButton);
+                  const { className, style, ...attrs } = submitSlot;
+                  return { className, style, ...attrs };
+                })()}
+                disabled={disabled || !!sending}
+                onClick={() => void onAction('wizard.submit')}
+              >
+                {submitLabel}
+              </button>
+            )}
+
+            <button
+              type="button"
+              {...(() => {
+                const resetSlot = applySlotProps({ style: { ...buttonStyle('default'), opacity: disabled || !!sending ? 0.7 : 1 } }, slotProps?.resetButton);
+                const { className, style, ...attrs } = resetSlot;
+                return { className, style, ...attrs };
+              })()}
+              disabled={disabled || !!sending}
+              onClick={() => void onAction('wizard.reset')}
+            >
+              Reset
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export const multiStepWizardRegistrationV1: RivuComponentRegistration<MultiStepWizardPropsV1, MultiStepWizardStateV1> = {
+  schemaVersion: MULTI_STEP_WIZARD_SCHEMA_VERSION,
+  propsSchema: multiStepWizardPropsV1Schema,
+  stateSchema: multiStepWizardStateV1Schema,
+  render: ({ kernel, host, componentId, revision, props, state }) => (
+    <MultiStepWizard host={host} kernel={kernel} componentId={componentId} revision={revision} state={state} {...props} />
+  ),
+};
+
 export const workflowRegistryV1 = {
   [APPROVAL_CARD_COMPONENT_TYPE]: approvalCardRegistrationV1,
   [CONFIRM_CARD_COMPONENT_TYPE]: confirmCardRegistrationV1,
   [TASK_STATUS_CARD_COMPONENT_TYPE]: taskStatusCardRegistrationV1,
   [FORM_CARD_COMPONENT_TYPE]: formCardRegistrationV1,
+  [MULTI_STEP_WIZARD_COMPONENT_TYPE]: multiStepWizardRegistrationV1,
 } satisfies RivuComponentRegistry;

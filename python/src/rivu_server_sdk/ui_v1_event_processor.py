@@ -220,6 +220,75 @@ class UiV1EventProcessor:
                 return component.model_copy(update={"state": state, "revision": revision + 1})
             raise InvalidPayloadError(f"unsupported FormCard eventName: {event_name}")
 
+        if component.type == "MultiStepWizard":
+            if event_name == "wizard.setField":
+                if set(payload.keys()) != {"fieldId", "value"}:
+                    raise InvalidPayloadError("payload must have only fieldId and value")
+
+                field_id = payload.get("fieldId")
+                if not isinstance(field_id, str) or not field_id.strip():
+                    raise InvalidPayloadError("payload.fieldId must be a non-empty string")
+
+                value = payload.get("value")
+                ok_value = value is None or isinstance(value, str) or is_finite_number(value)
+                if not ok_value:
+                    raise InvalidPayloadError("payload.value must be string|number|null")
+
+                values_state = dict(state.get("values") or {})
+                values_state[field_id] = value
+                state["values"] = values_state
+
+                errors_state = dict(state.get("errors") or {})
+                errors_state.pop(field_id, None)
+                state["errors"] = errors_state
+
+                return component.model_copy(update={"state": state, "revision": revision + 1})
+
+            if event_name in ("wizard.next", "wizard.prev", "wizard.submit", "wizard.reset") and payload:
+                raise InvalidPayloadError("payload must be empty")
+
+            steps = component.props.get("steps")
+            if not isinstance(steps, list) or len(steps) == 0:
+                raise InvalidPayloadError("MultiStepWizard props.steps must be a non-empty array")
+            step_ids: list[str] = []
+            for step in steps:
+                if not isinstance(step, dict):
+                    raise InvalidPayloadError("MultiStepWizard props.steps entries must be objects")
+                step_id = step.get("id")
+                if not isinstance(step_id, str) or not step_id.strip():
+                    raise InvalidPayloadError("MultiStepWizard step.id must be a non-empty string")
+                step_ids.append(step_id)
+
+            current_step_id = state.get("currentStepId")
+            if not isinstance(current_step_id, str) or not current_step_id.strip():
+                current_step_id = step_ids[0]
+
+            if event_name == "wizard.next":
+                idx = step_ids.index(current_step_id) if current_step_id in step_ids else 0
+                if idx + 1 < len(step_ids):
+                    state["currentStepId"] = step_ids[idx + 1]
+                return component.model_copy(update={"state": state, "revision": revision + 1})
+
+            if event_name == "wizard.prev":
+                idx = step_ids.index(current_step_id) if current_step_id in step_ids else 0
+                if idx > 0:
+                    state["currentStepId"] = step_ids[idx - 1]
+                return component.model_copy(update={"state": state, "revision": revision + 1})
+
+            if event_name == "wizard.submit":
+                state["status"] = "submitted"
+                return component.model_copy(update={"state": state, "revision": revision + 1})
+
+            if event_name == "wizard.reset":
+                state["currentStepId"] = step_ids[0]
+                state["values"] = {}
+                state.pop("errors", None)
+                state.pop("disabled", None)
+                state["status"] = "idle"
+                return component.model_copy(update={"state": state, "revision": revision + 1})
+
+            raise InvalidPayloadError(f"unsupported MultiStepWizard eventName: {event_name}")
+
         raise InvalidPayloadError(f"unsupported component type: {component.type}")
 
 

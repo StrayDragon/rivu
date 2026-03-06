@@ -22,6 +22,29 @@ export type { DiffViewLimitsV1, DiffViewModeV1, DiffViewPropsV1 } from './ui-dif
 export { diffViewLimitsV1Schema, diffViewModeV1Schema, diffViewPropsV1Schema } from './ui-diff-view.js';
 
 export type {
+  MultiStepWizardFieldOptionV1,
+  MultiStepWizardFieldTypeV1,
+  MultiStepWizardFieldV1,
+  MultiStepWizardPropsV1,
+  MultiStepWizardStateV1,
+  MultiStepWizardStepV1,
+  WizardEventNameV1,
+  WizardEventPayloadV1,
+  WizardSetFieldPayloadV1,
+} from './ui-multi-step-wizard.js';
+export {
+  multiStepWizardFieldOptionV1Schema,
+  multiStepWizardFieldTypeV1Schema,
+  multiStepWizardFieldV1Schema,
+  multiStepWizardPropsV1Schema,
+  multiStepWizardStateV1Schema,
+  multiStepWizardStepV1Schema,
+  wizardEventNameV1Schema,
+  wizardEventPayloadV1Schema,
+  wizardSetFieldPayloadV1Schema,
+} from './ui-multi-step-wizard.js';
+
+export type {
   ChartInteractionEventNameV1,
   ChartSelectionKindV1,
   ChartSelectionV1,
@@ -93,6 +116,8 @@ export {
   pivotTablePropsV1JsonSchema,
   heatmapPropsV1JsonSchema,
   diffViewPropsV1JsonSchema,
+  multiStepWizardPropsV1JsonSchema,
+  multiStepWizardStateV1JsonSchema,
   uiInputLimitsV1JsonSchema,
   uiV1CustomEventJsonSchema,
   uiV1EventValueJsonSchema,
