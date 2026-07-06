@@ -23,7 +23,7 @@
     "@types/d3-scale": "^4.0.9",
     "@types/d3-shape": "^3.1.7"
   },
-  "peerDependencies":
+  "peerDependencies": {
     "react": ">=19",
     "react-dom": ">=19"
   },
